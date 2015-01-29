@@ -13,7 +13,9 @@ public:
     void runMonteCarloIntegration();
 
 private:
-    double waveFunction(const mat &r);
+    double waveFunction(const mat &r, int &wavefunc_selection);
+    double waveFunctionAnalytical(const mat &r, int &wavefunc_selection);
+
     double localEnergy(const mat &r);
 
     int nDimensions;
@@ -27,8 +29,11 @@ private:
     long idum;
 
     double alpha;
+    double beta;
 
     int nCycles;
+
+    int wavefunc_selection;
 
     mat rOld;
     mat rNew;
