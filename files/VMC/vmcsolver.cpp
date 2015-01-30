@@ -10,6 +10,7 @@ using namespace std;
 VMCSolver::VMCSolver() :
     nDimensions(3),
     charge(2),
+    Z(2),
     stepLength(1.0),
     nParticles(2),
     h(0.001),
@@ -18,7 +19,8 @@ VMCSolver::VMCSolver() :
     alpha(0.5*charge),
     beta(1.0),
     nCycles(1000000),
-    wavefunc_selection(1)
+    wavefunc_selection(2),
+    energySolver_selection(2)
 {
 }
 
@@ -70,7 +72,7 @@ void VMCSolver::runMonteCarloIntegration()
                 }
             }
             // update energies
-            deltaE = localEnergy(rNew);
+            deltaE = localEnergy(rNew, energySolver_selection, wavefunc_selection);
             energySum += deltaE;
             energySquaredSum += deltaE*deltaE;
         }
@@ -80,61 +82,103 @@ void VMCSolver::runMonteCarloIntegration()
     cout << "Energy: " << energy << " Energy (squared sum): " << energySquared << endl;
 }
 
-double VMCSolver::localEnergy(const mat &r)
+double VMCSolver::localEnergy(const mat &r, int &energySolver_selection, int &wavefunc_selection)
 {
-    mat rPlus = zeros<mat>(nParticles, nDimensions);
-    mat rMinus = zeros<mat>(nParticles, nDimensions);
 
-    rPlus = rMinus = r;
+    if (energySolver_selection == 1){
 
-    double waveFunctionMinus = 0;
-    double waveFunctionPlus = 0;
+        mat rPlus = zeros<mat>(nParticles, nDimensions);
+        mat rMinus = zeros<mat>(nParticles, nDimensions);
 
-    double waveFunctionCurrent = waveFunction(r, wavefunc_selection);
+        rPlus = rMinus = r;
 
-    // Kinetic energy
+        double waveFunctionMinus = 0;
+        double waveFunctionPlus = 0;
 
-    double kineticEnergy = 0;
-    for(int i = 0; i < nParticles; i++) {
-        for(int j = 0; j < nDimensions; j++) {
-            rPlus(i,j) += h;
-            rMinus(i,j) -= h;
-            waveFunctionMinus = waveFunction(rMinus, wavefunc_selection);
-            waveFunctionPlus = waveFunction(rPlus, wavefunc_selection);
-            kineticEnergy -= (waveFunctionMinus + waveFunctionPlus - 2 * waveFunctionCurrent);
-            rPlus(i,j) = r(i,j);
-            rMinus(i,j) = r(i,j);
-        }
-    }
-    kineticEnergy = 0.5 * h2 * kineticEnergy / waveFunctionCurrent;
+        double waveFunctionCurrent = waveFunction(r, wavefunc_selection);
 
-    // Potential energy
-    double potentialEnergy = 0;
-    double rSingleParticle = 0;
-    for(int i = 0; i < nParticles; i++) {
-        rSingleParticle = 0;
-        for(int j = 0; j < nDimensions; j++) {
-            rSingleParticle += r(i,j)*r(i,j);
-        }
-        potentialEnergy -= charge / sqrt(rSingleParticle);
-    }
-    // Contribution from electron-electron potential
-    double r12 = 0;
-    for(int i = 0; i < nParticles; i++) {
-        for(int j = i + 1; j < nParticles; j++) {
-            r12 = 0;
-            for(int k = 0; k < nDimensions; k++) {
-                r12 += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
+        // Kinetic energy
+
+        double kineticEnergy = 0;
+        for(int i = 0; i < nParticles; i++) {
+            for(int j = 0; j < nDimensions; j++) {
+                rPlus(i,j) += h;
+                rMinus(i,j) -= h;
+                waveFunctionMinus = waveFunction(rMinus, wavefunc_selection);
+                waveFunctionPlus = waveFunction(rPlus, wavefunc_selection);
+                kineticEnergy -= (waveFunctionMinus + waveFunctionPlus - 2 * waveFunctionCurrent);
+                rPlus(i,j) = r(i,j);
+                rMinus(i,j) = r(i,j);
             }
-            potentialEnergy += 1 / sqrt(r12);
         }
+        kineticEnergy = 0.5 * h2 * kineticEnergy / waveFunctionCurrent;
+
+        // Potential energy
+        double potentialEnergy = 0;
+        double rSingleParticle = 0;
+        for(int i = 0; i < nParticles; i++) {
+            rSingleParticle = 0;
+            for(int j = 0; j < nDimensions; j++) {
+                rSingleParticle += r(i,j)*r(i,j);
+            }
+            potentialEnergy -= charge / sqrt(rSingleParticle);
+        }
+        // Contribution from electron-electron potential
+        double r12 = 0;
+        for(int i = 0; i < nParticles; i++) {
+            for(int j = i + 1; j < nParticles; j++) {
+                r12 = 0;
+                for(int k = 0; k < nDimensions; k++) {
+                    r12 += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
+                }
+                potentialEnergy += 1 / sqrt(r12);
+            }
+        }
+
+        return kineticEnergy + potentialEnergy;
     }
 
-    return kineticEnergy + potentialEnergy;
+    else {
+
+        double r1;
+        double r2;
+        double r12;
+        double r1_sum = 0;
+        double r2_sum = 0;
+        double r1_vec_r2_vec = 0;
+
+        double EL1 = 0;
+        double EL2 = 0;
+        double compact_fraction;
+
+        r12 = r12_func(r);
+
+        for(int i = 0; i < nDimensions; i++){
+            r1_sum += r(0, i)*r(0, i);
+            r2_sum += r(1, i)*r(1, i);
+            r1_vec_r2_vec += r(0, i)*r(1, i);
+        }
+        r1 = sqrt(r1_sum);
+        r2 = sqrt(r2_sum);
+
+        EL1 = (alpha - Z)*((1.0/r1) + (1.0/r2)) + (1.0/r12) - (alpha*alpha);
+
+        if (wavefunc_selection == 1){
+            return EL1;
+        }
+
+        else {
+            compact_fraction = 1.0/(2*(1.0 + beta*r12)*(1.0 + beta*r12));
+            EL2 = EL1 + compact_fraction*((alpha*(r1 + r2)/r12)*(1.0 - (r1_vec_r2_vec)/(r1*r2)) - compact_fraction - 2.0/r12 + (2.0*beta)/(1.0 + beta*r12));
+            return EL2;
+        }
+    }
 }
+
 
 double VMCSolver::waveFunction(const mat &r, int &wavefunc_selection)
 {
+
     if (wavefunc_selection == 1){
         double argument = 0;
         for(int i = 0; i < nParticles; i++) {
@@ -147,21 +191,9 @@ double VMCSolver::waveFunction(const mat &r, int &wavefunc_selection)
         return exp(-argument * alpha);
     }
 
-
-    //else if (wavefunc_selection == 2){
-    else{
-
-        //electron-electron potential
-        double r12 = 0;
-        for(int i = 0; i < nParticles; i++) {
-            for(int j = i + 1; j < nParticles; j++) {
-                r12 = 0;
-                for(int k = 0; k < nDimensions; k++) {
-                    r12 += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
-                }
-            }
-        }
-
+    else {
+        double r12;
+        r12 = r12_func(r);
 
         double argument = 0;
         for(int i = 0; i < nParticles; i++) {
@@ -174,16 +206,10 @@ double VMCSolver::waveFunction(const mat &r, int &wavefunc_selection)
         return exp(-argument * alpha)*exp(r12/(2*(1.0 + beta*r12)));
     }
 
+
 }
 
-
-double VMCSolver::waveFunctionAnalytical(const mat &r, int &wavefunc_selection)
-{
-    double EL1 = 0;
-    double EL2 = 0;
-    double compact_fraction;
-
-    //electron-electron potential
+double VMCSolver::r12_func(const mat &r){
     double r12 = 0;
     for(int i = 0; i < nParticles; i++) {
         for(int j = i + 1; j < nParticles; j++) {
@@ -193,23 +219,15 @@ double VMCSolver::waveFunctionAnalytical(const mat &r, int &wavefunc_selection)
             }
         }
     }
-
-
-    compact_fraction = 1.0/(2*(1.0 + beta*r12)*(1.0 + beta*r12));
-
-    EL1 = (alpha - Z)*((1.0/r1) + (1.0/r2)) + (1.0/r12) - (alpha*alpha);
-    EL2 = EL1 + compact_fraction*((alpha*(r1 + r2)/r12)*(1.0 - (r1_vec*r2_vec)/(r1*r2)) - compact_fraction - 2.0/r12 + (2.0*beta)/(1.0 + beta*r12));
-
-
-    if (wavefunc_selection == 1){
-        return EL1;
-    }
-
-    //else if (wavefunc_selection == 2){
-    else{
-        return EL2;
-    }
+    return r12;
 }
+
+
+
+
+
+
+
 
 
 

@@ -14,12 +14,12 @@ public:
 
 private:
     double waveFunction(const mat &r, int &wavefunc_selection);
-    double waveFunctionAnalytical(const mat &r, int &wavefunc_selection);
-
-    double localEnergy(const mat &r);
+    double localEnergy(const mat &r, int &energySolver_selection, int &wavefunc_selection);
+    double r12_func(const mat &r);
 
     int nDimensions;
     int charge;
+    int Z;
     double stepLength;
     int nParticles;
 
@@ -34,6 +34,7 @@ private:
     int nCycles;
 
     int wavefunc_selection;
+    int energySolver_selection;
 
     mat rOld;
     mat rNew;
