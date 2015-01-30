@@ -205,8 +205,6 @@ double VMCSolver::waveFunction(const mat &r, int &wavefunc_selection)
         }
         return exp(-argument * alpha)*exp(r12/(2*(1.0 + beta*r12)));
     }
-
-
 }
 
 double VMCSolver::r12_func(const mat &r){
