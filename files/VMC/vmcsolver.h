@@ -16,6 +16,7 @@ private:
     double waveFunction(const mat &r, int &wavefunc_selection);
     double localEnergy(const mat &r, int &energySolver_selection, int &wavefunc_selection);
     double r12_func(const mat &r);
+    double InvestigateOptimalAlpha();
 
     int nDimensions;
     int charge;

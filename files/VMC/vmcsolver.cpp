@@ -17,10 +17,10 @@ VMCSolver::VMCSolver() :
     h(0.001),
     h2(1000000),
     idum(-1),
-    alpha(0.5*charge),
+    alpha(1.0),
     beta(1.0),
     nCycles(1000000),
-    wavefunc_selection(2),
+    wavefunc_selection(1),
     energySolver_selection(2)
 {
 }
@@ -244,6 +244,76 @@ double VMCSolver::r12_func(const mat &r){
         }
     }
     return r12;
+}
+
+
+
+
+
+
+double VMCSolver::InvestigateOptimalAlpha(){
+    rOld = zeros<mat>(nParticles, nDimensions);
+    rNew = zeros<mat>(nParticles, nDimensions);
+
+    double waveFunctionOld = 0;
+    double waveFunctionNew = 0;
+
+    double energySum = 0;
+    double energySquaredSum = 0;
+
+    double deltaE;
+
+
+    for(int alphaCounter = 0; alphaCounter < 20; alphaCounter++){
+        alpha = 0.1*alphaCounter;
+
+        // initial trial positions
+        for(int i = 0; i < nParticles; i++) {
+            for(int j = 0; j < nDimensions; j++) {
+                rOld(i,j) = stepLength * (ran2(&idum) - 0.5);
+            }
+        }
+        rNew = rOld;
+
+        // loop over Monte Carlo cycles
+        for(int cycle = 0; cycle < nCycles; cycle++) {
+
+            // Store the current value of the wave function
+            waveFunctionOld = waveFunction(rOld, wavefunc_selection);
+
+            // New position to test
+            for(int i = 0; i < nParticles; i++) {
+                for(int j = 0; j < nDimensions; j++) {
+                    rNew(i,j) = rOld(i,j) + stepLength*(ran2(&idum) - 0.5);
+                }
+
+                // Recalculate the value of the wave function
+                waveFunctionNew = waveFunction(rNew, wavefunc_selection);
+
+                // Check for step acceptance (if yes, update position, if no, reset position)
+                if(ran2(&idum) <= (waveFunctionNew*waveFunctionNew) / (waveFunctionOld*waveFunctionOld)) {
+                    for(int j = 0; j < nDimensions; j++) {
+                        rOld(i,j) = rNew(i,j);
+                        waveFunctionOld = waveFunctionNew;
+                    }
+                } else {
+                    for(int j = 0; j < nDimensions; j++) {
+                        rNew(i,j) = rOld(i,j);
+                    }
+                }
+                // update energies
+                deltaE = localEnergy(rNew, energySolver_selection, wavefunc_selection);
+                energySum += deltaE;
+                energySquaredSum += deltaE*deltaE;
+            }
+        }
+
+
+        double energy = energySum/(nCycles * nParticles);
+        cout << "Alpha: " << alpha << "Energy: " << energy << endl;
+    }
+
+
 }
 
 
