@@ -3,6 +3,7 @@
 
 #include <armadillo>
 #include <iostream>
+#include <time.h>
 
 using namespace arma;
 using namespace std;
@@ -35,6 +36,10 @@ void VMCSolver::runMonteCarloIntegration()
     double energySum = 0;
     double energySquaredSum = 0;
 
+    double r12;
+    double r12_sum = 0.0;
+    int r12_counter = 0;
+
     double deltaE;
 
     // initial trial positions
@@ -44,6 +49,15 @@ void VMCSolver::runMonteCarloIntegration()
         }
     }
     rNew = rOld;
+
+    r12 = r12_func(rNew);
+    r12_sum += r12;
+    r12_counter += 1;
+
+    // Start clock to compute spent time for Monte Carlo simulation
+    double time;
+    clock_t start, finish;
+    start = clock();
 
     // loop over Monte Carlo cycles
     for(int cycle = 0; cycle < nCycles; cycle++) {
@@ -59,6 +73,11 @@ void VMCSolver::runMonteCarloIntegration()
 
             // Recalculate the value of the wave function
             waveFunctionNew = waveFunction(rNew, wavefunc_selection);
+
+            // Compute distance between electrons
+            r12 = r12_func(rNew);
+            r12_sum += r12;
+            r12_counter += 1;
 
             // Check for step acceptance (if yes, update position, if no, reset position)
             if(ran2(&idum) <= (waveFunctionNew*waveFunctionNew) / (waveFunctionOld*waveFunctionOld)) {
@@ -77,9 +96,16 @@ void VMCSolver::runMonteCarloIntegration()
             energySquaredSum += deltaE*deltaE;
         }
     }
+
+    // Stop the clock and estimate the spent time
+    finish = clock();
+    time = ((finish - start)/((double) CLOCKS_PER_SEC));
+
     double energy = energySum/(nCycles * nParticles);
     double energySquared = energySquaredSum/(nCycles * nParticles);
     cout << "Energy: " << energy << " Energy (squared sum): " << energySquared << endl;
+    cout << "Averange distance r12: " << r12_sum/r12_counter << endl;
+    cout << "Time consumption for " << nCycles << "Monte Carlo samples: " << time << " sec" << endl;
 }
 
 double VMCSolver::localEnergy(const mat &r, int &energySolver_selection, int &wavefunc_selection)
