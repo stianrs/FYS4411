@@ -513,7 +513,7 @@ void VMCSolver::InvestigateOptimalParameters(){
 
     double deltaE;
 
-    int nPoints = 10;
+    int nPoints = 100;
     double resolution;
 
     double optimalAlpha;
@@ -521,7 +521,7 @@ void VMCSolver::InvestigateOptimalParameters(){
     double minimumEnergy = 0;
 
     fstream outfile;
-    outfile.open("Parameter_Energy2.dat", ios::out);
+    outfile.open("Parameter_Energy.dat", ios::out);
 
     for(int alphaCounter = 1; alphaCounter < nPoints; alphaCounter++){
         resolution = 3.0/nPoints;
@@ -580,14 +580,13 @@ void VMCSolver::InvestigateOptimalParameters(){
                 minimumEnergy = energy;
                 optimalAlpha = alpha;
                 optimalBeta = beta;
-                cout << "HEI" << endl;
             }
-            cout << "minimum: " << minimumEnergy << endl;
+
             energySum = 0.0;
             energy = 0.0;
         }
     }
-    cout << optimalAlpha << " " << optimalBeta << " " << minimumEnergy << endl;
+    cout << "Optimal Alpha: " << optimalAlpha << " Optimal Beta: " << optimalBeta << " Minimum Energy" << minimumEnergy << endl;
     outfile.close();
 }
 
