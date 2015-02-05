@@ -18,8 +18,8 @@ VMCSolver::VMCSolver() :
     h(0.001),
     h2(1000000),
     idum(-1),
-    alpha(1.714),
-    beta(0.5714),
+    alpha(1.0), //alpha(1.843),
+    beta(0.347), //beta(0.347),
     nCycles(1000000),
     wavefunc_selection(2),
     energySolver_selection(2)
@@ -247,7 +247,7 @@ double VMCSolver::r12_func(const mat &r){
             }
         }
     }
-    return r12;
+    return sqrt(r12);
 }
 
 
@@ -274,7 +274,7 @@ double VMCSolver::InvestigateOptimalStep()
 
     double optimalStep = 1.0;
     double stepTrialStart = 0.1;
-    double maxStepLength = 3.0;
+    double maxStepLength = 10.0;
     int StepTrials = floor(maxStepLength/stepTrialStart);
 
     // initial trial positions
@@ -332,9 +332,12 @@ double VMCSolver::InvestigateOptimalStep()
             ratio = ratioTrial;
             optimalStep = stepLength;
         }
+        else{
+            break;
+        }
+
         counter = 0;
         acceptCounter = 0;
-
     }
     cout << "Optimal step length: " << optimalStep << "  Acceptance ratio: " << ratio << endl;
     return optimalStep;
@@ -498,7 +501,7 @@ void VMCSolver::InvestigateOptimalBeta(){
 
 
 
-double VMCSolver::InvestigateOptimalParameters(){
+void VMCSolver::InvestigateOptimalParameters(){
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
 
@@ -510,8 +513,12 @@ double VMCSolver::InvestigateOptimalParameters(){
 
     double deltaE;
 
-    int nPoints = 100;
+    int nPoints = 10;
     double resolution;
+
+    double optimalAlpha;
+    double optimalBeta;
+    double minimumEnergy = 0;
 
     fstream outfile;
     outfile.open("Parameter_Energy2.dat", ios::out);
@@ -566,13 +573,21 @@ double VMCSolver::InvestigateOptimalParameters(){
             }
 
             double energy = energySum/(nCycles * nParticles);
-            cout << "Alpha: " << alpha << " Beta: " << beta << " Energy: " << energy << endl;
+            //cout << "Alpha: " << alpha << " Beta: " << beta << " Energy: " << energy << endl;
             outfile << alpha << " " << beta << " " << energy << endl;
 
+            if (energy < minimumEnergy){
+                minimumEnergy = energy;
+                optimalAlpha = alpha;
+                optimalBeta = beta;
+                cout << "HEI" << endl;
+            }
+            cout << "minimum: " << minimumEnergy << endl;
             energySum = 0.0;
             energy = 0.0;
         }
     }
+    cout << optimalAlpha << " " << optimalBeta << " " << minimumEnergy << endl;
     outfile.close();
 }
 

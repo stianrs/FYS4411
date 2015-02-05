@@ -13,7 +13,7 @@ public:
     void runMonteCarloIntegration();
     void InvestigateOptimalAlpha();
     void InvestigateOptimalBeta();
-    double InvestigateOptimalParameters();
+    void InvestigateOptimalParameters();
 
 private:
     double waveFunction(const mat &r, int &wavefunc_selection);
