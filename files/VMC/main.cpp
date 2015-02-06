@@ -16,9 +16,13 @@ int main()
 
     VMCSolver *investigateBeta = new VMCSolver();
     investigateBeta->InvestigateOptimalBeta();
-*/
+
     VMCSolver *investigateParameters = new VMCSolver();
     investigateParameters->InvestigateOptimalParameters();
+*/
+
+    VMCSolver *investigateVariance = new VMCSolver();
+    investigateVariance->InvestigateVarianceNcycles();
 
     return 0;
 }

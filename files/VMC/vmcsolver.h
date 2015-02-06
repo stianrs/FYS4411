@@ -14,6 +14,8 @@ public:
     void InvestigateOptimalAlpha();
     void InvestigateOptimalBeta();
     void InvestigateOptimalParameters();
+    void InvestigateVarianceNcycles();
+    void MonteCarloIntegration(int nCycles, double &energy, double &variance, double &averange_r12, double &time);
 
 private:
     double waveFunction(const mat &r, int &wavefunc_selection);

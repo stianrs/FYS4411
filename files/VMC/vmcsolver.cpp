@@ -18,7 +18,7 @@ VMCSolver::VMCSolver() :
     h(0.001),
     h2(1000000),
     idum(-1),
-    alpha(1.0), //alpha(1.843),
+    alpha(1.843), //alpha(1.843),
     beta(0.347), //beta(0.347),
     nCycles(1000000),
     wavefunc_selection(2),
@@ -106,8 +106,11 @@ void VMCSolver::runMonteCarloIntegration()
 
     double energy = energySum/(nCycles * nParticles);
     double energySquared = energySquaredSum/(nCycles * nParticles);
+
+    double variance = energySquared - (energy*energy);
+
     cout << "Energy: " << energy << " Energy (squared sum): " << energySquared << endl;
-    cout << "Averange distance r12: " << r12_sum/r12_counter << endl;
+    cout << "Variance: " << variance << " Averange distance r12: " << r12_sum/r12_counter << endl;
     cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << time << " sec" << endl;
 }
 
@@ -254,6 +257,7 @@ double VMCSolver::r12_func(const mat &r){
 
 
 
+
 double VMCSolver::InvestigateOptimalStep()
 {
     rOld = zeros<mat>(nParticles, nDimensions);
@@ -285,9 +289,7 @@ double VMCSolver::InvestigateOptimalStep()
     }
     rNew = rOld;
 
-
     for(int stepCount = 0; stepCount < StepTrials; stepCount++){
-
         stepLength = stepTrialStart + stepCount*stepTrialStart;
 
         // loop over Monte Carlo cycles
@@ -335,7 +337,6 @@ double VMCSolver::InvestigateOptimalStep()
         else{
             break;
         }
-
         counter = 0;
         acceptCounter = 0;
     }
@@ -596,6 +597,125 @@ void VMCSolver::InvestigateOptimalParameters(){
 
 
 
+
+
+
+void VMCSolver::MonteCarloIntegration(int nCycles, double &energy, double &variance, double &averange_r12, double &time)
+{
+    rOld = zeros<mat>(nParticles, nDimensions);
+    rNew = zeros<mat>(nParticles, nDimensions);
+
+    double waveFunctionOld = 0;
+    double waveFunctionNew = 0;
+
+    double energySum = 0;
+    double energySquaredSum = 0;
+
+    double r12;
+    double r12_sum = 0.0;
+    int r12_counter = 0;
+
+    double deltaE;
+
+    stepLength = 1.4;
+
+    // initial trial positions
+    for(int i = 0; i < nParticles; i++) {
+        for(int j = 0; j < nDimensions; j++) {
+            rOld(i,j) = stepLength * (ran2(&idum) - 0.5);
+        }
+    }
+    rNew = rOld;
+
+    r12 = r12_func(rNew);
+    r12_sum += r12;
+    r12_counter += 1;
+
+    // Start clock to compute spent time for Monte Carlo simulation
+    clock_t start, finish;
+    start = clock();
+
+    // loop over Monte Carlo cycles
+    for(int cycle = 0; cycle < nCycles; cycle++) {
+
+        // Store the current value of the wave function
+        waveFunctionOld = waveFunction(rOld, wavefunc_selection);
+
+        // New position to test
+        for(int i = 0; i < nParticles; i++) {
+            for(int j = 0; j < nDimensions; j++) {
+                rNew(i,j) = rOld(i,j) + stepLength*(ran2(&idum) - 0.5);
+            }
+
+            // Recalculate the value of the wave function
+            waveFunctionNew = waveFunction(rNew, wavefunc_selection);
+
+            // Compute distance between electrons
+            r12 = r12_func(rNew);
+            r12_sum += r12;
+            r12_counter += 1;
+
+            // Check for step acceptance (if yes, update position, if no, reset position)
+            if(ran2(&idum) <= (waveFunctionNew*waveFunctionNew) / (waveFunctionOld*waveFunctionOld)) {
+                for(int j = 0; j < nDimensions; j++) {
+                    rOld(i,j) = rNew(i,j);
+                    waveFunctionOld = waveFunctionNew;
+                }
+            } else {
+                for(int j = 0; j < nDimensions; j++) {
+                    rNew(i,j) = rOld(i,j);
+                }
+            }
+            // update energies
+            deltaE = localEnergy(rNew, energySolver_selection, wavefunc_selection);
+            energySum += deltaE;
+            energySquaredSum += deltaE*deltaE;
+        }
+    }
+
+    // Stop the clock and estimate the spent time
+    finish = clock();
+    time = ((finish - start)/((double) CLOCKS_PER_SEC));
+
+    energy = energySum/(nCycles * nParticles);
+    double energySquared = energySquaredSum/(nCycles * nParticles);
+
+    variance = energySquared - (energy*energy);
+    averange_r12 = r12_sum/r12_counter;
+
+    //cout << "Energy: " << energy << " Energy (squared sum): " << energySquared << endl;
+    //cout << "Variance: " << variance << " Averange distance r12: " << averange_r12 << endl;
+    //cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << time << " sec" << endl;
+}
+
+
+
+
+void VMCSolver::InvestigateVarianceNcycles(){
+    double energy;
+    double variance;
+    double averange_r12;
+    double time;
+
+    int nSimulations = 30;
+
+    fstream outfile;
+    outfile.open("Variance_nSampels.dat", ios::out);
+
+    int nCycles;
+
+    for(int i=0; i < nSimulations; i++){
+        MonteCarloIntegration(nCycles, energy, variance, averange_r12, time);
+
+        nCycles = 500000 + 1000000*i;
+        cout << variance << " " << nCycles << endl;
+        outfile << nCycles << " " << variance << endl;
+    }
+
+
+
+    outfile.close();
+}
 
 
 
