@@ -19,10 +19,14 @@ int main()
 
     VMCSolver *investigateParameters = new VMCSolver();
     investigateParameters->InvestigateOptimalParameters();
-*/
+
 
     VMCSolver *investigateVariance = new VMCSolver();
     investigateVariance->InvestigateVarianceNcycles();
+*/
 
+    VMCSolver *Blocking = new VMCSolver();
+    Blocking->BlockingFunc();
     return 0;
+
 }

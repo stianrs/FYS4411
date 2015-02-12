@@ -600,10 +600,12 @@ void VMCSolver::InvestigateOptimalParameters(){
 
 
 
-void VMCSolver::MonteCarloIntegration(int nCycles, double &energy, double &variance, double &averange_r12, double &time)
+void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r12, double &time)
 {
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
+
+    int n = nCycles*nParticles;
 
     double waveFunctionOld = 0;
     double waveFunctionNew = 0;
@@ -616,6 +618,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, double &energy, double &varia
     int r12_counter = 0;
 
     double deltaE;
+    int counter = 0;
 
     stepLength = 1.4;
 
@@ -630,6 +633,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, double &energy, double &varia
     r12 = r12_func(rNew);
     r12_sum += r12;
     r12_counter += 1;
+
 
     // Start clock to compute spent time for Monte Carlo simulation
     clock_t start, finish;
@@ -670,6 +674,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, double &energy, double &varia
             deltaE = localEnergy(rNew, energySolver_selection, wavefunc_selection);
             energySum += deltaE;
             energySquaredSum += deltaE*deltaE;
+
+            energy_single(counter) = deltaE;
+            energySquared_single(counter) = deltaE*deltaE;
+            counter += 1;
         }
     }
 
@@ -677,27 +685,23 @@ void VMCSolver::MonteCarloIntegration(int nCycles, double &energy, double &varia
     finish = clock();
     time = ((finish - start)/((double) CLOCKS_PER_SEC));
 
-    energy = energySum/(nCycles * nParticles);
-    double energySquared = energySquaredSum/(nCycles * nParticles);
+    double energy_mean = energySum/n;
+    double energySquared_mean = energySquaredSum/n;
 
-    variance = energySquared - (energy*energy);
+    variance = (energySquared_mean - (energy_mean*energy_mean))/n;
     averange_r12 = r12_sum/r12_counter;
-
-    //cout << "Energy: " << energy << " Energy (squared sum): " << energySquared << endl;
-    //cout << "Variance: " << variance << " Averange distance r12: " << averange_r12 << endl;
-    //cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << time << " sec" << endl;
 }
 
 
 
 
 void VMCSolver::InvestigateVarianceNcycles(){
-    double energy;
+    double energy_mean;
     double variance;
     double averange_r12;
     double time;
 
-    int nSimulations = 30;
+    int nSimulations = 10;
 
     fstream outfile;
     outfile.open("Variance_nSampels.dat", ios::out);
@@ -705,19 +709,46 @@ void VMCSolver::InvestigateVarianceNcycles(){
     int nCycles;
 
     for(int i=0; i < nSimulations; i++){
-        MonteCarloIntegration(nCycles, energy, variance, averange_r12, time);
-
         nCycles = 500000 + 1000000*i;
-        cout << variance << " " << nCycles << endl;
+
+        int n = (nCycles*nParticles);
+        vec energy_single = zeros(n);
+        vec energySquared_single = zeros(n);
+
+        MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
+
+        energy_mean = sum(energy_single)/n;
+
+        cout << nCycles << " " << variance << " "  << energy_mean << endl;
         outfile << nCycles << " " << variance << endl;
     }
-
-
-
     outfile.close();
 }
 
 
+
+void VMCSolver::BlockingFunc(){
+    double variance;
+    double averange_r12;
+    double time;
+
+    int nCycles = 100000;
+    int n = (nCycles*nParticles);
+
+    fstream outfile;
+    outfile.open("Blocking_data.dat", ios::out);
+
+    vec energy_single = zeros(n);
+    vec energySquared_single = zeros(n);
+
+    MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
+
+    for(int i=0; i<n; i++){
+        //cout << energy_single(i) << " " << energySquared_single(i) << endl;
+        outfile << energy_single(i) << " " << energySquared_single(i) << endl;
+    }
+    outfile.close();
+}
 
 
 
