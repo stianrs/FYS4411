@@ -23,10 +23,11 @@ int main()
 
     VMCSolver *investigateVariance = new VMCSolver();
     investigateVariance->InvestigateVarianceNcycles();
-*/
+
 
     VMCSolver *Blocking = new VMCSolver();
     Blocking->BlockingFunc();
     return 0;
+*/
 
 }

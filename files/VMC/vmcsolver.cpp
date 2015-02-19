@@ -732,7 +732,7 @@ void VMCSolver::BlockingFunc(){
     double averange_r12;
     double time;
 
-    int nCycles = 100000;
+    int nCycles = 5000000;
     int n = (nCycles*nParticles);
 
     fstream outfile;
