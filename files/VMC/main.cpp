@@ -1,21 +1,34 @@
 #include "vmcsolver.h"
+#include "investigate.h"
 
 #include <iostream>
+#include <armadillo>
+
 
 using namespace std;
+using namespace arma;
 
 int main()
 {
 
-/*
+    //    int nCycles;
+    //    vec energy_single;
+    //    vec energySquared_single;
+    //    double variance;
+    //    double averange_r12;
+    //    double time;
+
+
+    int nCycles = 10000000;
+
+
+    /*
     VMCSolver *solver = new VMCSolver();
-    solver->runMonteCarloIntegration();
+    solver->runMonteCarloIntegration(nCycles);
 
     VMCSolver *investigateAlpha = new VMCSolver();
     investigateAlpha->InvestigateOptimalAlpha();
 
-    VMCSolver *investigateBeta = new VMCSolver();
-    investigateBeta->InvestigateOptimalBeta();
 
     VMCSolver *investigateParameters = new VMCSolver();
     investigateParameters->InvestigateOptimalParameters();
@@ -27,7 +40,21 @@ int main()
 
     VMCSolver *Blocking = new VMCSolver();
     Blocking->BlockingFunc();
-    return 0;
+
+
+    VMCSolver *investigateCPU = new VMCSolver();
+    investigateCPU->InvestigateCPUtime();
+
+
+    VMCSolver *solver = new VMCSolver();
+    solver->runimportanceMonteCarloIntegration(nCycles);
 */
+
+    VMCSolver *investigateTimestepDependence = new VMCSolver();
+    investigateTimestepDependence ->InvestigateTimestep();
+
+
+    return 0;
+
 
 }

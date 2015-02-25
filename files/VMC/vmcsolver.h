@@ -3,6 +3,7 @@
 
 #include <armadillo>
 
+
 using namespace arma;
 
 class VMCSolver
@@ -10,12 +11,15 @@ class VMCSolver
 public:
     VMCSolver();
 
-    void runMonteCarloIntegration();
+    void runMonteCarloIntegration(int nCycles);
+    void runimportanceMonteCarloIntegration(int nCycles);
+    void MonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r12, double &time);
+    void importanceMonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r12, double &time);
     void InvestigateOptimalAlpha();
-    void InvestigateOptimalBeta();
     void InvestigateOptimalParameters();
     void InvestigateVarianceNcycles();
-    void MonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r12, double &time);
+    void InvestigateCPUtime();
+    void InvestigateTimestep();
     void BlockingFunc();
 
 private:
@@ -23,6 +27,7 @@ private:
     double localEnergy(const mat &r, int &energySolver_selection, int &wavefunc_selection);
     double r12_func(const mat &r);
     double InvestigateOptimalStep();
+    double QuantumForce(const mat &r, mat F);
 
     int nDimensions;
     int charge;
@@ -40,11 +45,21 @@ private:
 
     int nCycles;
 
+    //  we fix the time step  for the gaussian deviate
+    double timestep;
+    // diffusion constant from Schroedinger equation
+    double D;
+    double GreensFunction;
+
+
     int wavefunc_selection;
     int energySolver_selection;
 
     mat rOld;
     mat rNew;
+    mat QForceOld;
+    mat QForceNew;
 };
+
 
 #endif // VMCSOLVER_H

@@ -6,8 +6,10 @@ LIBS += -llapack -larmadillo
 
 SOURCES += main.cpp \
     vmcsolver.cpp \
-    lib.cpp
+    lib.cpp \
+    investigate.cpp
 
 HEADERS += \
     vmcsolver.h \
-    lib.h
+    lib.h \
+    investigate.h
