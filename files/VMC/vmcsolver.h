@@ -25,7 +25,7 @@ public:
 private:
     double waveFunction(const mat &r, int &wavefunc_selection);
     double localEnergy(const mat &r, int &energySolver_selection, int &wavefunc_selection);
-    double r12_func(const mat &r);
+    void r12_func(const mat &r);
     double InvestigateOptimalStep();
     double QuantumForce(const mat &r, mat F);
     double psi1s(r);
@@ -63,6 +63,7 @@ private:
     mat rNew;
     mat QForceOld;
     mat QForceNew;
+    mat r;
     mat a_matrix;
 };
 

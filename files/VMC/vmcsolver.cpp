@@ -30,6 +30,7 @@ VMCSolver::VMCSolver() :
     activate_ImportanceSampling(1)
 
 {
+    r = zeros(nParticles, nParticles);
 }
 
 void VMCSolver::runMonteCarloIntegration(int nCycles)
@@ -82,8 +83,9 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
     }
     rNew = rOld;
 
-    r12 = r12_func(rNew);
-    r12_sum += r12;
+    r12_func(rNew);
+
+    r12_sum += sum(r);
     r12_counter += 1;
 
 
@@ -176,7 +178,7 @@ void VMCSolver::importanceMonteCarloIntegration(int nCycles, vec &energy_single,
     //stepLength = InvestigateOptimalStep();
 
     // initial trial positions
-    for(int i = 0; i < nParticles; i++) {
+    for(int i = 0; i < nParticles; i++){
         for(int j = 0; j < nDimensions; j++) {
             rOld(i,j) = GaussianDeviate(&idum)*sqrt(timestep);
         }
@@ -403,17 +405,17 @@ double VMCSolver::waveFunction(const mat &r, int &wavefunc_selection)
     }
 }
 
-double VMCSolver::r12_func(const mat &r){
-    double r12 = 0;
-    for(int i = 0; i < nParticles; i++) {
+void VMCSolver::r12_func(const mat &r){
+
+    for(int i = 0; i < nParticles; i++){
+        double r12 = 0;
         for(int j = i + 1; j < nParticles; j++) {
-            r12 = 0;
             for(int k = 0; k < nDimensions; k++) {
                 r12 += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
             }
+            r(i,j) = sqrt(r12);
         }
     }
-    return sqrt(r12);
 }
 
 
@@ -446,6 +448,7 @@ double VMCSolver::QuantumForce(const mat &r, mat QForce)
         }
     }
 }
+
 
 
 
@@ -488,18 +491,52 @@ void VMCSolver::fill_a_matrix(){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void VMCSolver::JastrowFactor(){
-    double Psi;
+    double Psi = 1.0;
     for(int j=0; j<nParticles; j++){
         for(int i=0; i<j; i++){
             Psi *= exp((a_matrix(i,j)*r(i,j))/(1.0 + beta*r(i,j)));
         }
     }
 }
-
-
-
-
 
 
 
@@ -517,12 +554,7 @@ void VMCSolver::SlaterDeterminant(){
 
 
     // Slater determinant, no factors as they vanish in Metropolis ratio
-    wf  = (psi1s(argument[0])*psi2s(argument[1])
-            -psi1s(argument[1])*psi2s(argument[0]))*
-            (psi1s(argument[2])*psi2s(argument[3])
-            -psi1s(argument[3])*psi2s(argument[2]));
-
-}
+    wf  = (psi1s(argument[0])*psi2s(argument[1])-psi1s(argument[1])*psi2s(argument[0]))*(psi1s(argument[2])*psi2s(argument[3])-psi1s(argument[3])*psi2s(argument[2]));
 
 }
 
