@@ -9,6 +9,7 @@ void InvestigateVarianceNcycles();
 void InvestigateCPUtime();
 void InvestigateTimestep();
 void BlockingFunc();
+void OnebodyDensity_ChargeDensity();
 
 
 #endif // INVESTIGATE_H

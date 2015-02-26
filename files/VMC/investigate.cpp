@@ -272,28 +272,22 @@ void VMCSolver::InvestigateOptimalParameters(){
 
 
 void VMCSolver::InvestigateVarianceNcycles(){
-    double energy_mean;
-    double variance;
-    double averange_r12;
-    double time;
-
     int nSimulations = 10;
+    double variance;
+    int nCycles;
 
     fstream outfile;
     outfile.open("Variance_nSampels.dat", ios::out);
-
-    int nCycles;
 
     for(int i=0; i < nSimulations; i++){
         nCycles = 500000 + 1000000*i;
 
         int n = (nCycles*nParticles);
         vec energy_single = zeros(n);
-        vec energySquared_single = zeros(n);
 
-        MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
+        runMonteCarloIntegration(nCycles);
 
-        energy_mean = sum(energy_single)/n;
+        double energy_mean = sum(energy_single)/n;
 
         cout << nCycles << " " << variance << " "  << energy_mean << endl;
         outfile << nCycles << " " << variance << endl;
@@ -303,18 +297,13 @@ void VMCSolver::InvestigateVarianceNcycles(){
 
 
 void VMCSolver::InvestigateCPUtime(){
-    double variance;
-    double averange_r12;
-    double time;
-
     int nSimulations = 10;
-
+    int nCycles;
+    double time;
     mat time_values = zeros(nSimulations, 5);
 
     fstream outfile;
     outfile.open("cpu_time.dat", ios::out);
-
-    int nCycles;
 
     int counter = 1;
     for(int i=1; i<=2; i++){
@@ -326,11 +315,7 @@ void VMCSolver::InvestigateCPUtime(){
             for(int k=0; k < nSimulations; k++){
                 nCycles = 500000 + 1000000*k;
 
-                int n = (nCycles*nParticles);
-                vec energy_single = zeros(n);
-                vec energySquared_single = zeros(n);
-
-                MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
+                runMonteCarloIntegration(nCycles);
 
                 time_values(k, 0) = nCycles;
                 time_values(k, counter) = time;
@@ -347,26 +332,19 @@ void VMCSolver::InvestigateCPUtime(){
 
 
 void VMCSolver::InvestigateTimestep(){
-    double variance;
-    double averange_r12;
-    double time;
-
     int nSimulations = 10;
+    double averange_r12;
 
     fstream outfile;
     outfile.open("timestep_dependence.dat", ios::out);
 
-    int nCycles = 1000000;
-
     for(int i=0; i < nSimulations; i++){
-
         timestep = 0.01 + 0.02*i;
 
         int n = (nCycles*nParticles);
         vec energy_single = zeros(n);
-        vec energySquared_single = zeros(n);
 
-        importanceMonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
+        runMonteCarloIntegration(nCycles);
 
         double energy = sum(energy_single)/n;
         cout << timestep << " " << energy << " "  << averange_r12 << endl;
@@ -376,31 +354,45 @@ void VMCSolver::InvestigateTimestep(){
 }
 
 
-
-
-
 void VMCSolver::BlockingFunc(){
-    double variance;
-    double averange_r12;
-    double time;
-
     int nCycles = 5000000;
     int n = (nCycles*nParticles);
-
-    fstream outfile;
-    outfile.open("Blocking_data.dat", ios::out);
 
     vec energy_single = zeros(n);
     vec energySquared_single = zeros(n);
 
-    MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
+    runMonteCarloIntegration(nCycles);
+
+    fstream outfile;
+    outfile.open("Blocking_data.dat", ios::out);
 
     for(int i=0; i<n; i++){
-        //cout << energy_single(i) << " " << energySquared_single(i) << endl;
         outfile << energy_single(i) << " " << energySquared_single(i) << endl;
     }
     outfile.close();
 }
+
+
+void VMCSolver::OnebodyDensity_ChargeDensity(){
+    int n = (nCycles*nParticles);
+    double averange_r12;
+    vec energy_single = zeros(n);
+
+    runMonteCarloIntegration(nCycles);
+
+    double energy = sum(energy_single)/n;
+    double ChargeDensity = charge/averange_r12;
+
+    fstream outfile;
+    outfile.open("OnebodyDensity_ChargeDensity.dat", ios::out);
+
+    cout << nCycles << " " << energy << " "  << ChargeDensity << endl;
+    outfile << nCycles << " " << energy << " "  << ChargeDensity << endl;
+
+    outfile.close();
+}
+
+
 
 
 

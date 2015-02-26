@@ -12,7 +12,6 @@ public:
     VMCSolver();
 
     void runMonteCarloIntegration(int nCycles);
-    void runimportanceMonteCarloIntegration(int nCycles);
     void MonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r12, double &time);
     void importanceMonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r12, double &time);
     void InvestigateOptimalAlpha();
@@ -21,6 +20,7 @@ public:
     void InvestigateCPUtime();
     void InvestigateTimestep();
     void BlockingFunc();
+    void OnebodyDensity_ChargeDensity();
 
 private:
     double waveFunction(const mat &r, int &wavefunc_selection);
@@ -28,6 +28,9 @@ private:
     double r12_func(const mat &r);
     double InvestigateOptimalStep();
     double QuantumForce(const mat &r, mat F);
+    double psi1s(r);
+    double psi2s(r);
+    void fill_a_matrix();
 
     int nDimensions;
     int charge;
@@ -54,11 +57,13 @@ private:
 
     int wavefunc_selection;
     int energySolver_selection;
+    int activate_ImportanceSampling;
 
     mat rOld;
     mat rNew;
     mat QForceOld;
     mat QForceNew;
+    mat a_matrix;
 };
 
 

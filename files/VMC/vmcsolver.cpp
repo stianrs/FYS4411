@@ -25,8 +25,9 @@ VMCSolver::VMCSolver() :
     timestep(0.05), // IS
     D(0.5), // IS
 
-    wavefunc_selection(2),
-    energySolver_selection(2)
+    wavefunc_selection(1),
+    energySolver_selection(2),
+    activate_ImportanceSampling(1)
 
 {
 }
@@ -40,28 +41,18 @@ void VMCSolver::runMonteCarloIntegration(int nCycles)
     double averange_r12;
     double time;
 
-    MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
+    if(activate_JastrowFactor == 1){
+        MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
+    }
+    else{
+        importanceMonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
+    }
 }
-
-
-void VMCSolver::runimportanceMonteCarloIntegration(int nCycles)
-{
-    int n = (nCycles*nParticles);
-    vec energy_single = zeros(n);
-    vec energySquared_single = zeros(n);
-    double variance;
-    double averange_r12;
-    double time;
-
-    importanceMonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r12, time);
-}
-
 
 
 
 void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r12, double &time)
 {
-
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
 
@@ -127,7 +118,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
                 }
             }
 
-
             // Compute distance between electrons
             r12 = r12_func(rNew);
             r12_sum += r12;
@@ -157,15 +147,11 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
 
     cout << "Variance: " << variance << " Averange distance r12: " << r12_sum/r12_counter << endl;
     cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << time << " sec" << endl;
-
 }
-
-
 
 
 void VMCSolver::importanceMonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r12, double &time)
 {
-
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
     QForceOld = zeros<mat>(nParticles, nDimensions);
@@ -463,6 +449,82 @@ double VMCSolver::QuantumForce(const mat &r, mat QForce)
 
 
 
+double VMCSolver::psi1s(r){
+    double psi1s;
+    psi1s = exp(-alpha*r);
+    return psi1s;
+}
+
+double VMCSolver::psi2s(r){
+    double psi2s;
+    psi2s = (1.0 - alpha*r/2.0)*exp(-alpha*r/2.0);
+    return psi2s;
+}
+
+
+
+void VMCSolver::fill_a_matrix(){
+    vec spin = zeros(nParticles);
+    a_matrix = zeros(nParticles, nParticles);
+
+    spin(0) = 1;
+    spin(1) = 1;
+    spin(2) = 0;
+    spin(3) = 0;
+
+    double  a;
+    for(int i=0; i<nParticles; i++){
+        for(int j=0; j<nParticles; j++){
+            if(spin(i) == spin(j)){
+                a = 1.0/4.0;
+            }
+            else{
+                a = 1.0/2.0;
+            }
+            a_matrix(i,j) = a;
+        }
+    }
+}
+
+
+
+void VMCSolver::JastrowFactor(){
+    double Psi;
+    for(int j=0; j<nParticles; j++){
+        for(int i=0; i<j; i++){
+            Psi *= exp((a_matrix(i,j)*r(i,j))/(1.0 + beta*r(i,j)));
+        }
+    }
+}
+
+
+
+
+
+
+
+void VMCSolver::SlaterDeterminant(){
+    vec argument = zeros(nParticles);
+
+    for (i = 0; i < nParticles; i++) {
+        argument[i] = 0.0;
+        r_single_particle = 0;
+        for (j = 0; j < dimension; j++) {
+            r_single_particle  += r[i][j]*r[i][j];
+        }
+        argument[i] = sqrt(r_single_particle);
+    }
+
+
+    // Slater determinant, no factors as they vanish in Metropolis ratio
+    wf  = (psi1s(argument[0])*psi2s(argument[1])
+            -psi1s(argument[1])*psi2s(argument[0]))*
+            (psi1s(argument[2])*psi2s(argument[3])
+            -psi1s(argument[3])*psi2s(argument[2]));
+
+}
+
+}
 
 
 
