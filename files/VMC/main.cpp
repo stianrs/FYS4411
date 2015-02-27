@@ -21,7 +21,6 @@ int main()
 
     int nCycles = 1000000;
 
-
     VMCSolver *solver = new VMCSolver();
     solver->runMonteCarloIntegration(nCycles);
 
