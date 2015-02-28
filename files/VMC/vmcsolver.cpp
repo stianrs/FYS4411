@@ -12,22 +12,20 @@ using namespace std;
 
 VMCSolver::VMCSolver() :
     nDimensions(3),
-    charge(4),
-    Z(2),
-    stepLength(1.0),
-    nParticles(4),
+    charge(2),
+    nParticles(2),
+    stepLength(1.4),
     h(0.001),
     h2(1000000),
     idum(-1),
-    alpha(3.9), //alpha(1.843),
-    beta(0.09), //beta(0.347),
-    nCycles(500000),
-    timestep(0.05), // IS
+    alpha(1.85), //alpha(1.843), 3.9
+    beta(0.35), //beta(0.347), 0.09
+    nCycles(1000000),
+    timestep(0.01), // IS
     D(0.5), // IS
-
-    wavefunc_selection(4),
-    energySolver_selection(1),
-    activate_ImportanceSampling(1)
+    wavefunc_selection(2),
+    energySolver_selection(2),
+    deactivate_ImportanceSampling(true)
 
 {
     r_distance = zeros(nParticles, nParticles);
@@ -50,8 +48,9 @@ void VMCSolver::runMonteCarloIntegration(int nCycles)
 
 void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r_ij, double &time)
 {
+    fill_a_matrix();
 
-    if(activate_ImportanceSampling==1){
+    if(deactivate_ImportanceSampling){
         rOld = zeros<mat>(nParticles, nDimensions);
         rNew = zeros<mat>(nParticles, nDimensions);
 
@@ -94,7 +93,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
         for(int cycle = 0; cycle < nCycles; cycle++) {
 
             // Store the current value of the wave function
-            waveFunctionOld = waveFunction(rOld, wavefunc_selection);
+            waveFunctionOld = waveFunction(rOld);
 
             // New position to test
             for(int i = 0; i < nParticles; i++) {
@@ -103,7 +102,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
                 }
 
                 // Recalculate the value of the wave function
-                waveFunctionNew = waveFunction(rNew, wavefunc_selection);
+                waveFunctionNew = waveFunction(rNew);
 
                 // Check for step acceptance (if yes, update position, if no, reset position)
                 if(ran2(&idum) <= (waveFunctionNew*waveFunctionNew) / (waveFunctionOld*waveFunctionOld)) {
@@ -124,7 +123,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
 
 
                 // update energies
-                deltaE = localEnergy(rNew, energySolver_selection, wavefunc_selection);
+                deltaE = localEnergy(rNew);
                 energySum += deltaE;
                 energySquaredSum += deltaE*deltaE;
 
@@ -170,8 +169,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
         double deltaE;
         int counter = 0;
 
-        stepLength = 1.4;
-        //stepLength = InvestigateOptimalStep();
+        int counter2 = 0;
+        double acceptCounter = 0;
 
         // initial trial positions
         for(int i = 0; i < nParticles; i++){
@@ -196,8 +195,9 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
         for(int cycle = 0; cycle < nCycles; cycle++) {
 
             // Store the current value of the wave function
-            waveFunctionOld = waveFunction(rOld, wavefunc_selection);
-            QuantumForce(rOld, QForceOld); QForceOld = QForceOld*h/waveFunctionOld;
+            waveFunctionOld = waveFunction(rOld);
+            QuantumForce(rOld, QForceOld);
+            QForceOld = QForceOld*h/waveFunctionOld;
 
             // New position to test
             for(int i = 0; i < nParticles; i++) {
@@ -215,7 +215,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
                 }
 
                 // Recalculate the value of the wave function and the quantum force
-                waveFunctionNew = waveFunction(rNew, wavefunc_selection);
+                waveFunctionNew = waveFunction(rNew);
                 QuantumForce(rNew,QForceNew); QForceNew*h/waveFunctionNew;
 
                 //  we compute the log of the ratio of the greens functions to be used in the
@@ -235,11 +235,14 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
                         QForceOld(i,j) = QForceNew(i,j);
                         waveFunctionOld = waveFunctionNew;
                     }
+                    acceptCounter += 1;
+                    counter2 += 1;
                 } else {
                     for(int j = 0; j < nDimensions; j++) {
                         rNew(i,j) = rOld(i,j);
                         QForceNew(i,j) = QForceOld(i,j);
                     }
+                    counter2 += 1;
                 }
 
                 // Compute distance between electrons
@@ -248,7 +251,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
                 r_ij_counter += 1;
 
                 // update energies
-                deltaE = localEnergy(rNew, energySolver_selection, wavefunc_selection);
+                deltaE = localEnergy(rNew);
                 energySum += deltaE;
                 energySquaredSum += deltaE*deltaE;
 
@@ -257,6 +260,9 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
                 counter += 1;
             }
         }
+
+        double ratioTrial = acceptCounter/counter2;
+        cout << "Acceptance ratio: " << ratioTrial << endl;
 
         // Stop the clock and estimate the spent time
         finish = clock();
@@ -275,7 +281,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
 
 
 
-double VMCSolver::localEnergy(const mat &r, int &energySolver_selection, int &wavefunc_selection)
+double VMCSolver::localEnergy(const mat &r)
 {
 
     if (energySolver_selection == 1){
@@ -288,7 +294,7 @@ double VMCSolver::localEnergy(const mat &r, int &energySolver_selection, int &wa
         double waveFunctionMinus = 0;
         double waveFunctionPlus = 0;
 
-        double waveFunctionCurrent = waveFunction(r, wavefunc_selection);
+        double waveFunctionCurrent = waveFunction(r);
 
         // Kinetic energy
 
@@ -297,8 +303,8 @@ double VMCSolver::localEnergy(const mat &r, int &energySolver_selection, int &wa
             for(int j = 0; j < nDimensions; j++) {
                 rPlus(i,j) += h;
                 rMinus(i,j) -= h;
-                waveFunctionMinus = waveFunction(rMinus, wavefunc_selection);
-                waveFunctionPlus = waveFunction(rPlus, wavefunc_selection);
+                waveFunctionMinus = waveFunction(rMinus);
+                waveFunctionPlus = waveFunction(rPlus);
                 kineticEnergy -= (waveFunctionMinus + waveFunctionPlus - 2 * waveFunctionCurrent);
                 rPlus(i,j) = r(i,j);
                 rMinus(i,j) = r(i,j);
@@ -317,14 +323,13 @@ double VMCSolver::localEnergy(const mat &r, int &energySolver_selection, int &wa
             potentialEnergy -= charge / sqrt(rSingleParticle);
         }
         // Contribution from electron-electron potential
-        double r12 = 0;
         for(int i = 0; i < nParticles; i++) {
-            for(int j = i + 1; j < nParticles; j++) {
-                r12 = 0;
+            for(int j = i+1; j < nParticles; j++) {
+                double r_ij = 0;
                 for(int k = 0; k < nDimensions; k++) {
-                    r12 += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
+                    r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
                 }
-                potentialEnergy += 1 / sqrt(r12);
+                potentialEnergy += 1.0/sqrt(r_ij);
             }
         }
 
@@ -369,7 +374,7 @@ double VMCSolver::localEnergy(const mat &r, int &energySolver_selection, int &wa
 }
 
 
-double VMCSolver::waveFunction(const mat &r, int &wavefunc_selection)
+double VMCSolver::waveFunction(const mat &r)
 {
 
     if (wavefunc_selection == 1){
@@ -387,7 +392,7 @@ double VMCSolver::waveFunction(const mat &r, int &wavefunc_selection)
     if (wavefunc_selection == 2){
         r_func(r);
         int div = nParticles*nParticles - nParticles;
-        double r12 = sum(sum(r))/div;
+        double r12 = sum(sum(r_distance))/div;
 
         double argument = 0;
         for(int i = 0; i < nParticles; i++) {
@@ -411,7 +416,6 @@ double VMCSolver::waveFunction(const mat &r, int &wavefunc_selection)
 
     if (wavefunc_selection == 4){
         r_func(r);
-        fill_a_matrix();
 
         double factor = JastrowFactor();
         double hydrogenic = SlaterDeterminant();
@@ -443,7 +447,7 @@ void VMCSolver::r_func(const mat &positions){
 
 
 
-void VMCSolver::QuantumForce(const mat &r, mat QForce)
+void VMCSolver::QuantumForce(const mat &r, mat &QForce)
 {
     mat rPlus = zeros<mat>(nParticles, nDimensions);
     mat rMinus = zeros<mat>(nParticles, nDimensions);
@@ -457,8 +461,8 @@ void VMCSolver::QuantumForce(const mat &r, mat QForce)
         for(int j = 0; j < nDimensions; j++) {
             rPlus(i,j) += h;
             rMinus(i,j) -= h;
-            waveFunctionMinus = waveFunction(rMinus, wavefunc_selection);
-            waveFunctionPlus = waveFunction(rPlus, wavefunc_selection);
+            waveFunctionMinus = waveFunction(rMinus);
+            waveFunctionPlus = waveFunction(rPlus);
             QForce(i,j) =  (waveFunctionPlus-waveFunctionMinus);
             rPlus(i,j) = r(i,j);
             rMinus(i,j) = r(i,j);
@@ -508,8 +512,6 @@ void VMCSolver::fill_a_matrix(){
 }
 
 
-
-
 double VMCSolver::JastrowFactor(){
     double Psi = 1.0;
     for(int j=0; j<nParticles; j++){
@@ -519,7 +521,6 @@ double VMCSolver::JastrowFactor(){
     }
     return Psi;
 }
-
 
 
 double VMCSolver::SlaterDeterminant(){

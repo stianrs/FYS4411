@@ -49,7 +49,7 @@ double VMCSolver::InvestigateOptimalStep()
         for(int cycle = 0; cycle < stepCycles; cycle++){
 
             // Store the current value of the wave function
-            waveFunctionOld = waveFunction(rOld, wavefunc_selection);
+            waveFunctionOld = waveFunction(rOld);
 
             // New position to test
             for(int i = 0; i < nParticles; i++) {
@@ -58,7 +58,7 @@ double VMCSolver::InvestigateOptimalStep()
                 }
 
                 // Recalculate the value of the wave function
-                waveFunctionNew = waveFunction(rNew, wavefunc_selection);
+                waveFunctionNew = waveFunction(rNew);
 
                 // Check for step acceptance (if yes, update position, if no, reset position)
                 if(ran2(&idum) <= (waveFunctionNew*waveFunctionNew) / (waveFunctionOld*waveFunctionOld)) {
@@ -77,7 +77,7 @@ double VMCSolver::InvestigateOptimalStep()
                 }
 
                 // update energies
-                deltaE = localEnergy(rNew, energySolver_selection, wavefunc_selection);
+                deltaE = localEnergy(rNew);
                 energySum += deltaE;
             }
         }
@@ -138,7 +138,7 @@ void VMCSolver::InvestigateOptimalAlpha(){
         for(int cycle = 0; cycle < nCycles; cycle++) {
 
             // Store the current value of the wave function
-            waveFunctionOld = waveFunction(rOld, wavefunc_selection);
+            waveFunctionOld = waveFunction(rOld);
 
             // New position to test
             for(int i = 0; i < nParticles; i++) {
@@ -147,7 +147,7 @@ void VMCSolver::InvestigateOptimalAlpha(){
                 }
 
                 // Recalculate the value of the wave function
-                waveFunctionNew = waveFunction(rNew, wavefunc_selection);
+                waveFunctionNew = waveFunction(rNew);
 
                 // Check for step acceptance (if yes, update position, if no, reset position)
                 if(ran2(&idum) <= (waveFunctionNew*waveFunctionNew) / (waveFunctionOld*waveFunctionOld)) {
@@ -161,7 +161,7 @@ void VMCSolver::InvestigateOptimalAlpha(){
                     }
                 }
                 // update energies
-                deltaE = localEnergy(rNew, energySolver_selection, wavefunc_selection);
+                deltaE = localEnergy(rNew);
                 energySum += deltaE;
                 energySquaredSum += deltaE*deltaE;
             }
@@ -200,16 +200,23 @@ void VMCSolver::InvestigateOptimalParameters(){
     double optimalBeta;
     double minimumEnergy = 0;
 
+    double minimum_Alpha = 1.0;
+    double maximum_Alpha = 3.0;
+    double minimum_Beta = 0.2;
+    double maximum_Beta = 0.5;
+
+    nCycles = 100000;
+
     fstream outfile;
-    outfile.open("Parameter_Energy.dat", ios::out);
+    outfile.open("Parameter_Energy2.dat", ios::out);
 
     for(int alphaCounter = 1; alphaCounter < nPoints; alphaCounter++){
-        resolution = 3.0/nPoints;
-        alpha = resolution + resolution*alphaCounter;
+        resolution = (maximum_Alpha - minimum_Alpha)/nPoints;
+        alpha = minimum_Alpha + resolution*alphaCounter;
 
         for(int betaCounter = 1; betaCounter < nPoints; betaCounter++){
-            resolution = 3.0/nPoints;
-            beta = resolution + resolution*betaCounter;
+            resolution = (maximum_Beta - minimum_Beta)/nPoints;
+            beta = minimum_Beta + resolution*betaCounter;
 
             // initial trial positions
             for(int i = 0; i < nParticles; i++) {
@@ -223,7 +230,7 @@ void VMCSolver::InvestigateOptimalParameters(){
             for(int cycle = 0; cycle < nCycles; cycle++) {
 
                 // Store the current value of the wave function
-                waveFunctionOld = waveFunction(rOld, wavefunc_selection);
+                waveFunctionOld = waveFunction(rOld);
 
                 // New position to test
                 for(int i = 0; i < nParticles; i++) {
@@ -232,7 +239,7 @@ void VMCSolver::InvestigateOptimalParameters(){
                     }
 
                     // Recalculate the value of the wave function
-                    waveFunctionNew = waveFunction(rNew, wavefunc_selection);
+                    waveFunctionNew = waveFunction(rNew);
 
                     // Check for step acceptance (if yes, update position, if no, reset position)
                     if(ran2(&idum) <= (waveFunctionNew*waveFunctionNew) / (waveFunctionOld*waveFunctionOld)) {
@@ -246,7 +253,7 @@ void VMCSolver::InvestigateOptimalParameters(){
                         }
                     }
                     // update energies
-                    deltaE = localEnergy(rNew, energySolver_selection, wavefunc_selection);
+                    deltaE = localEnergy(rNew);
                     energySum += deltaE;
                     energySquaredSum += deltaE*deltaE;
                 }
@@ -265,6 +272,7 @@ void VMCSolver::InvestigateOptimalParameters(){
             energySum = 0.0;
             energy = 0.0;
         }
+        cout << "loop num: " << alphaCounter << endl;
     }
     cout << "Optimal Alpha: " << optimalAlpha << " Optimal Beta: " << optimalBeta << " Minimum Energy" << minimumEnergy << endl;
     outfile.close();
@@ -272,25 +280,25 @@ void VMCSolver::InvestigateOptimalParameters(){
 
 
 void VMCSolver::InvestigateVarianceNcycles(){
-    int nSimulations = 10;
+    int nSimulations = 300;
     double variance;
     int nCycles;
 
     int n = (nCycles*nParticles);
-    vec energy_single = zeros(n);
-    vec energySquared_single = zeros(n);
+
     double averange_r_ij;
     double time;
 
 
     fstream outfile;
-    outfile.open("Variance_nSampels.dat", ios::out);
+    outfile.open("Variance_nSampels2.dat", ios::out);
 
     for(int i=0; i < nSimulations; i++){
-        nCycles = 500000 + 1000000*i;
+        nCycles = 10000 + 1000*i;
 
         int n = (nCycles*nParticles);
         vec energy_single = zeros(n);
+        vec energySquared_single = zeros(n);
 
         MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r_ij, time);
 
@@ -346,7 +354,7 @@ void VMCSolver::InvestigateCPUtime(){
 
 
 void VMCSolver::InvestigateTimestep(){
-    int nSimulations = 10;
+    int nSimulations = 30;
 
     double variance;
     double averange_r_ij;
@@ -356,17 +364,17 @@ void VMCSolver::InvestigateTimestep(){
     outfile.open("timestep_dependence.dat", ios::out);
 
     for(int i=0; i < nSimulations; i++){
-        timestep = 0.01 + 0.02*i;
+        timestep = 0.001 + 0.001*i;
 
         int n = (nCycles*nParticles);
         vec energy_single = zeros(n);
-            vec energySquared_single = zeros(n);
+        vec energySquared_single = zeros(n);
 
         MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r_ij, time);
 
         double energy = sum(energy_single)/n;
-        cout << timestep << " " << energy << " "  << averange_r_ij << endl;
-        outfile << timestep << " " << energy << " "  << averange_r_ij << endl;
+        cout << timestep << " " << energy << " "  << variance << " " << averange_r_ij << " " << time << endl;
+        outfile << timestep << " " << energy << " " << variance << " "  << averange_r_ij << " " << time << endl;
     }
     outfile.close();
 }
@@ -393,6 +401,9 @@ void VMCSolver::BlockingFunc(){
 }
 
 
+
+
+
 void VMCSolver::OnebodyDensity_ChargeDensity(){
     int n = (nCycles*nParticles);
     vec energy_single = zeros(n);
@@ -404,7 +415,8 @@ void VMCSolver::OnebodyDensity_ChargeDensity(){
     MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r_ij, time);
 
     double energy = sum(energy_single)/n;
-    double ChargeDensity = charge/averange_r_ij;
+
+
 
     fstream outfile;
     outfile.open("OnebodyDensity_ChargeDensity.dat", ios::out);

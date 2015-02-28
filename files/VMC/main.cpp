@@ -19,11 +19,20 @@ int main()
     //    double time;
 
 
-    int nCycles = 1000000;
+    int nCycles = 4000000;
 
-    VMCSolver *solver = new VMCSolver();
-    solver->runMonteCarloIntegration(nCycles);
 
+    //VMCSolver *solver = new VMCSolver();
+    //solver->runMonteCarloIntegration(nCycles);
+
+
+
+    VMCSolver *Blocking = new VMCSolver();
+    Blocking->BlockingFunc();
+
+
+    //VMCSolver *investigateTimestepDependence = new VMCSolver();
+    //investigateTimestepDependence ->InvestigateTimestep();
   /*
     VMCSolver *Blocking = new VMCSolver();
     Blocking->BlockingFunc();

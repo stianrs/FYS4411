@@ -22,11 +22,11 @@ public:
     void OnebodyDensity_ChargeDensity();
 
 private:
-    double waveFunction(const mat &r, int &wavefunc_selection);
-    double localEnergy(const mat &r, int &energySolver_selection, int &wavefunc_selection);
+    double waveFunction(const mat &r);
+    double localEnergy(const mat &r);
     void r_func(const mat &positions);
     double InvestigateOptimalStep();
-    void QuantumForce(const mat &r, mat F);
+    void QuantumForce(const mat &r, mat &F);
     double psi1s(double &r);
     double psi2s(double &r);
     void fill_a_matrix();
@@ -35,9 +35,8 @@ private:
 
     int nDimensions;
     int charge;
-    int Z;
-    double stepLength;
     int nParticles;
+    double stepLength;
 
     double h;
     double h2;
@@ -58,7 +57,7 @@ private:
 
     int wavefunc_selection;
     int energySolver_selection;
-    int activate_ImportanceSampling;
+    bool deactivate_ImportanceSampling;
 
     mat rOld;
     mat rNew;
