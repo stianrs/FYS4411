@@ -1,3 +1,7 @@
+/*
+This is the program with the MC solver both with and without importrance sampling
+*/
+
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
@@ -12,33 +16,35 @@ using namespace std;
 
 VMCSolver::VMCSolver() :
     nDimensions(3),
-    charge(4),
-    nParticles(4),
-    stepLength(2.7), // 1.3 2.7
+    charge(2),
+    nParticles(2),
+    stepLength(1.3), // is set automatic in the solver, helium: 1.3, beryllium: 2.7
     h(0.001),
     h2(1000000),
-    idum(-1),
-    alpha(3.9), //alpha(1.843), 3.9
-    beta(0.1), //beta(0.347), 0.09
-    nCycles(1000000),
-    timestep(0.002), // IS
-    D(0.5), // IS
-    wavefunc_selection(3),
-    energySolver_selection(1),
-    deactivate_ImportanceSampling(false),
+    idum(-1), // random number seed
+    alpha(1.85), // helium: 1.85, bryllium: 3.9
+    beta(0.35), // helium: 0.35, beryllium: 0.1
+    nCycles(1000000), // number of MC cycles, (not used!)
+    timestep(0.002), // timestep used in importance sampling
+    D(0.5), // constant used with importance sampling
+    wavefunc_selection(2), // =1 helium hydrogenic, =2, helium Jastrow, =3 beryllium hydrogenic, =4 beryllium Jastrow
+    energySolver_selection(2), // =1 use numerical integration, =2 to use analytical expressions
+    deactivate_ImportanceSampling(false), // set false to activate importance sampling
 
-    save_positions(true)
+    save_positions(false) // set true to save all intermediate postitions in an MC simulation
 
 
 {
-    r_distance = zeros(nParticles, nParticles);
-    r_centre = zeros(nParticles);
+    r_distance = zeros(nParticles, nParticles); // distance between electrons
+    r_centre = zeros(nParticles); // distance between nucleus and electrons
 }
 
+// function to run MC simualtions form main.cpp
 void VMCSolver::runMonteCarloIntegration(int nCycles)
 {
     int n = (nCycles*nParticles);
-    mat positions = zeros(n, nParticles*nDimensions);
+    //mat positions = zeros(n*nParticles + nParticles, nDimensions);
+    mat positions = zeros(2*nParticles, nDimensions); // used if little memory aviable
     vec energy_single = zeros(n);
     vec energySquared_single = zeros(n);
     double variance;
@@ -49,10 +55,13 @@ void VMCSolver::runMonteCarloIntegration(int nCycles)
 }
 
 
-
+// The Monte Carlo solver both with and without importance sampling
 void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r_ij, double &time)
 {
+
+    // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
+
 
     if(deactivate_ImportanceSampling){
         cout << "Without importance sampling" << "  Wavefunc_selection: " << wavefunc_selection << "  energySolver_selection: " << energySolver_selection << endl;
@@ -74,9 +83,9 @@ void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_s
         double deltaE;
         int counter = 0;
 
+        int counter2 = 0;
+        double acceptCounter = 0;
 
-        //stepLength = 1.3;
-        //stepLength = 2.7;
         stepLength = InvestigateOptimalStep();
 
         // initial trial positions
@@ -87,7 +96,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_s
         }
         rNew = rOld;
 
-
+        // store initial position
         int pos_counter_round = 0;
         for(int i=0; i < nParticles; i++){
             for(int j=0; j < nDimensions; j++){
@@ -96,12 +105,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_s
             pos_counter_round++;
         }
 
-
-
+        // calculate distance between electrons
         r_func(rNew);
         int div = nParticles*nParticles - nParticles;
         r_ij_sum += sum(sum(r_distance))/div;
-
         r_ij_counter += 1;
 
         // Start clock to compute spent time for Monte Carlo simulation
@@ -129,13 +136,16 @@ void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_s
                         rOld(i,j) = rNew(i,j);
                         waveFunctionOld = waveFunctionNew;
                     }
+                    acceptCounter += 1;
+                    counter2 += 1;
                 } else {
                     for(int j = 0; j < nDimensions; j++) {
                         rNew(i,j) = rOld(i,j);
                     }
+                    counter2 += 1;
                 }
 
-                // Compute distance between electrons
+                // Compute new distance between electrons
                 r_func(rNew);
                 r_ij_sum += sum(sum(r_distance))/div;
                 r_ij_counter += 1;
@@ -150,26 +160,20 @@ void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_s
                 energySquared_single(counter) = deltaE*deltaE;
                 counter += 1;
 
-
+                // store all intermediate positions
                 if(save_positions){
-
                     for(int i=0; i < nParticles; i++){
                         for(int j=0; j < nDimensions; j++){
                             positions(pos_counter_round, j) = rNew(i, j);
-
                         }
                         pos_counter_round++;
                     }
-
-
                 }
-
-
-
-
             }
-
         }
+
+        double ratioTrial = acceptCounter/counter2;
+        cout << "Acceptance ratio: " << ratioTrial << endl;
 
         // Stop the clock and estimate the spent time
         finish = clock();
@@ -218,7 +222,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_s
         }
         rNew = rOld;
 
-
+        // store initial position
         int pos_counter_round = 0;
         for(int i=0; i < nParticles; i++){
             for(int j=0; j < nDimensions; j++){
@@ -227,12 +231,11 @@ void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_s
             pos_counter_round++;
         }
 
+        // calculate distance between electrons
         r_func(rNew);
         int div = nParticles*nParticles - nParticles;
         r_ij_sum += sum(sum(r_distance))/div;
-
         r_ij_counter += 1;
-
 
         // Start clock to compute spent time for Monte Carlo simulation
         clock_t start, finish;
@@ -306,19 +309,15 @@ void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_s
                 energySquared_single(counter) = deltaE*deltaE;
                 counter += 1;
 
-
-
+                // store all intermediate positions
                 if(save_positions){
 
                     for(int i=0; i < nParticles; i++){
                         for(int j=0; j < nDimensions; j++){
                             positions(pos_counter_round, j) = rNew(i, j);
-
                         }
                         pos_counter_round++;
                     }
-
-
                 }
             }
         }
@@ -343,9 +342,11 @@ void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_s
 
 
 
+// function to compute local energy both numerical and analytical (if expression is found by user)
 double VMCSolver::localEnergy(const mat &r)
 {
 
+    // numerical computation of local energy
     if (energySolver_selection == 1){
 
         mat rPlus = zeros<mat>(nParticles, nDimensions);
@@ -359,7 +360,6 @@ double VMCSolver::localEnergy(const mat &r)
         double waveFunctionCurrent = waveFunction(r);
 
         // Kinetic energy
-
         double kineticEnergy = 0;
         for(int i = 0; i < nParticles; i++) {
             for(int j = 0; j < nDimensions; j++) {
@@ -384,6 +384,7 @@ double VMCSolver::localEnergy(const mat &r)
             }
             potentialEnergy -= charge / sqrt(rSingleParticle);
         }
+
         // Contribution from electron-electron potential
         for(int i = 0; i < nParticles; i++) {
             for(int j = i+1; j < nParticles; j++) {
@@ -394,10 +395,10 @@ double VMCSolver::localEnergy(const mat &r)
                 potentialEnergy += 1.0/sqrt(r_ij);
             }
         }
-
         return kineticEnergy + potentialEnergy;
     }
 
+    // analytical expressions for local energy
     else {
 
         double r1;
@@ -436,6 +437,7 @@ double VMCSolver::localEnergy(const mat &r)
 }
 
 
+// function that compute wavefunctions given with to compute bu user
 double VMCSolver::waveFunction(const mat &r)
 {
 
@@ -475,7 +477,6 @@ double VMCSolver::waveFunction(const mat &r)
         return hydrogenic;
     }
 
-
     if (wavefunc_selection == 4){
         r_func(r);
 
@@ -486,6 +487,8 @@ double VMCSolver::waveFunction(const mat &r)
 }
 
 
+
+// compute the distance between all electrons in the atom and the distance from the nucleus
 void VMCSolver::r_func(const mat &positions){
     mat distance = zeros(nParticles, nParticles);
     vec radius = zeros(nParticles);
@@ -508,7 +511,7 @@ void VMCSolver::r_func(const mat &positions){
 
 
 
-
+// compute the quantum force used in importance sampling
 void VMCSolver::QuantumForce(const mat &r, mat &QForce)
 {
     mat rPlus = zeros<mat>(nParticles, nDimensions);
@@ -533,20 +536,21 @@ void VMCSolver::QuantumForce(const mat &r, mat &QForce)
 }
 
 
-
+// 1s hydrogenic orbital
 double VMCSolver::psi1s(double &r){
     double psi1s;
     psi1s = exp(-alpha*r);
     return psi1s;
 }
 
+// 2s hydrogenic orbital
 double VMCSolver::psi2s(double &r){
     double psi2s;
     psi2s = (1.0 - alpha*r/2.0)*exp(-alpha*r/2.0);
     return psi2s;
 }
 
-
+// set up spinns and compute the a-matrix
 void VMCSolver::fill_a_matrix(){
     vec spin = zeros(nParticles);
     for(int i=0; i<nParticles; i++){
@@ -557,7 +561,6 @@ void VMCSolver::fill_a_matrix(){
             spin(i) = 0;
         }
     }
-
     a_matrix = zeros(nParticles, nParticles);
     double  a;
     for(int i=0; i < nParticles; i++){
@@ -573,19 +576,18 @@ void VMCSolver::fill_a_matrix(){
     }
 }
 
-
+// compute the Jastrow factor
 double VMCSolver::JastrowFactor(){
     double Psi = 1.0;
     for(int j=0; j < nParticles; j++){
         for(int i=0; i < j; i++){
             Psi *= exp((a_matrix(i,j)*r_distance(i,j))/(1.0 + beta*r_distance(i,j)));
         }
-
     }
     return Psi;
 }
 
-
+// compoue the Slater determinant for Beryllium
 double VMCSolver::SlaterDeterminant(){
     vec argument = zeros(nParticles);
 

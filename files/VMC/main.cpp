@@ -1,3 +1,8 @@
+/*
+This is the main program used to run Monte Carlo simulations with "vmcsolver.cpp" and run different functions
+in "investigate.cpp" using vmcsolver.cpp.
+*/
+
 #include "vmcsolver.h"
 #include "investigate.h"
 
@@ -11,54 +16,28 @@ using namespace arma;
 int main()
 {
 
-    //    int nCycles;
-    //    vec energy_single;
-    //    vec energySquared_single;
-    //    double variance;
-    //    double averange_r12;
-    //    double time;
 
+    int nCycles = 100000000;
 
-    int nCycles = 1000000;
-
-
-    //VMCSolver *solver = new VMCSolver();
+    //MCSolver *solver = new VMCSolver();
     //solver->runMonteCarloIntegration(nCycles);
 
-    //VMCSolver *investigateOnebodyDensity_ChargeDensity = new VMCSolver();
-    //investigateOnebodyDensity_ChargeDensity ->OnebodyDensity_ChargeDensity();
+    VMCSolver *investigateCPU = new VMCSolver();
+    investigateCPU->InvestigateCPUtime();
 
-    //VMCSolver *investigateParameters = new VMCSolver();
-    //investigateParameters->InvestigateOptimalParameters();
-
-
-    //VMCSolver *Blocking = new VMCSolver();
-    //Blocking->BlockingFunc();
-
-
-  /*
-    VMCSolver *Blocking = new VMCSolver();
-    Blocking->BlockingFunc();
-
-
-    VMCSolver *solver = new VMCSolver();
-    solver->runMonteCarloIntegration(nCycles);
+/*
 
     VMCSolver *investigateAlpha = new VMCSolver();
     investigateAlpha->InvestigateOptimalAlpha();
 
-
     VMCSolver *investigateParameters = new VMCSolver();
     investigateParameters->InvestigateOptimalParameters();
-
 
     VMCSolver *investigateVariance = new VMCSolver();
     investigateVariance->InvestigateVarianceNcycles();
 
-
     VMCSolver *Blocking = new VMCSolver();
     Blocking->BlockingFunc();
-
 
     VMCSolver *investigateCPU = new VMCSolver();
     investigateCPU->InvestigateCPUtime();

@@ -1,3 +1,7 @@
+/*
+This program includes functions that compute different parameters used in the MC solver
+and functions to perform spesific collection of data from MC simulations
+*/
 
 #include "vmcsolver.h"
 #include "lib.h"
@@ -11,9 +15,14 @@
 using namespace arma;
 using namespace std;
 
+
+// algorithm to find a steplength that gives an acceptance ratio about 0.5
 double VMCSolver::InvestigateOptimalStep()
 {
+    // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
+
+    nCycles = 1000000;
 
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
@@ -84,6 +93,7 @@ double VMCSolver::InvestigateOptimalStep()
             }
         }
 
+        // test if the acceptance ratio is bigger than 0.5, it yes, break
         ratioTrial = acceptCounter/counter;
         if (abs(ratioTrial-0.5) < abs(ratio-0.5)){
             ratio = ratioTrial;
@@ -95,18 +105,23 @@ double VMCSolver::InvestigateOptimalStep()
         counter = 0;
         acceptCounter = 0;
     }
-    cout << "Optimal step length: " << optimalStep << "  Acceptance ratio: " << ratio << endl;
+    cout << "Optimal step length: " << optimalStep << "   Acceptance ratio: " << ratio << endl;
     return optimalStep;
 }
 
 
 
-
-
-
-
-
+// function that run MC simulations with different values of alpha, compute the corresponding
+// energy, write to file, and print out the optimal alpha with correponding energy
 void VMCSolver::InvestigateOptimalAlpha(){
+
+    // fill spin matrix needed if we simulate atoms with more than 2 electrons
+    fill_a_matrix();
+
+    nCycles = 100000;
+    int nPoints = 100;
+    int n = nCycles*nParticles;
+
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
 
@@ -115,15 +130,16 @@ void VMCSolver::InvestigateOptimalAlpha(){
 
     double energySum = 0;
     double energySquaredSum = 0;
+    double minimumEnergy = 0;
 
     double deltaE;
-
-    int nPoints = 21;
     double resolution;
+    double optimalAlpha;
 
     fstream outfile;
     outfile.open("Alpha_Energy.dat", ios::out);
 
+    // run loop over different values of alpha
     for(int alphaCounter = 0; alphaCounter < nPoints; alphaCounter++){
         resolution = 3.0/nPoints;
         alpha = resolution*alphaCounter;
@@ -168,24 +184,34 @@ void VMCSolver::InvestigateOptimalAlpha(){
                 energySquaredSum += deltaE*deltaE;
             }
         }
+        double energy = energySum/n;
 
-        double energy = energySum/(nCycles * nParticles);
-        cout << "Alpha: " << alpha << "  Energy: " << energy << endl;
+        // update alpha if lower energies are found
+        if (energy < minimumEnergy){
+            minimumEnergy = energy;
+            optimalAlpha = alpha;
+        }
         outfile << alpha << " " << energy << endl;
 
+        // reset energies for next alpha
         energySum = 0.0;
         energy = 0.0;
     }
+    cout << "Optimal Alpha: " << optimalAlpha << " Minimum Energy: " << minimumEnergy << endl;
     outfile.close();
 }
 
 
-
-
-
+// function that run MC simulations with different values of alpha and beta, compute the corresponding
+// energy, write to file, and print out the optimal set of parameters with correponding energy
 void VMCSolver::InvestigateOptimalParameters(){
 
+    // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
+
+    nCycles = 100000;
+    int nPoints = 100;
+    int n = nCycles*nParticles;
 
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
@@ -195,31 +221,36 @@ void VMCSolver::InvestigateOptimalParameters(){
 
     double energySum = 0;
     double energySquaredSum = 0;
-
-    double deltaE;
-
-    int nPoints = 20;
-    double resolution;
-
-    double optimalAlpha;
-    double optimalBeta;
     double minimumEnergy = 0;
 
-    //double minimum_Alpha = 1.0;
-    //double maximum_Alpha = 3.0;
-    //double minimum_Beta = 0.2;
-    //double maximum_Beta = 0.5;
+    double deltaE;
+    double resolution;
+    double optimalAlpha;
+    double optimalBeta;
 
-    double minimum_Alpha = 3.8;
-    double maximum_Alpha = 4.1;
-    double minimum_Beta = 0.05;
-    double maximum_Beta = 0.15;
+    double minimum_Alpha;
+    double maximum_Alpha;
+    double minimum_Beta;
+    double maximum_Beta;
 
-    nCycles = 100000;
+    // set range to investigate for different atoms
+    if(charge == 2){
+        minimum_Alpha = 1.0;
+        maximum_Alpha = 3.0;
+        minimum_Beta = 0.2;
+        maximum_Beta = 0.5;
+    }
+    else{
+        minimum_Alpha = 3.8;
+        maximum_Alpha = 4.1;
+        minimum_Beta = 0.05;
+        maximum_Beta = 0.15;
+    }
 
     fstream outfile;
     outfile.open("Parameter_Energy_Beryllium.dat", ios::out);
 
+    // run loops over different pairs of alpha and beta
     for(int alphaCounter = 1; alphaCounter < nPoints; alphaCounter++){
         resolution = (maximum_Alpha - minimum_Alpha)/nPoints;
         alpha = minimum_Alpha + resolution*alphaCounter;
@@ -269,87 +300,84 @@ void VMCSolver::InvestigateOptimalParameters(){
                 }
             }
 
-            double energy = energySum/(nCycles * nParticles);
-            double energySquared = energySquaredSum/(nCycles * nParticles);
-            double variance = (energySquared - (energy*energy))/(nCycles * nParticles);
-            //cout << "Alpha: " << alpha << " Beta: " << beta << " Energy: " << energy << endl;
+            double energy = energySum/n;
+            double energySquared = energySquaredSum/n;
+            double variance = (energySquared - (energy*energy))/n;
             outfile << alpha << " " << beta << " " << energy << " " << variance << endl;
 
+            // update parameters if lower energies are found
             if (energy < minimumEnergy){
                 minimumEnergy = energy;
                 optimalAlpha = alpha;
                 optimalBeta = beta;
             }
 
+            // reset energies for next pair of parameters
             energySum = 0.0;
             energy = 0.0;
         }
-        cout << "loop num: " << alphaCounter << endl;
+        cout << "loop num: " << alphaCounter << endl; // counter to see progress in CPU-heavy simulation
     }
-    cout << "Optimal Alpha: " << optimalAlpha << " Optimal Beta: " << optimalBeta << " Minimum Energy" << minimumEnergy << endl;
+    cout << "Optimal Alpha: " << optimalAlpha << " Optimal Beta: " << optimalBeta << " Minimum Energy: " << minimumEnergy << endl;
     outfile.close();
 }
 
 
+
+// function that run MC simulations with different number of nCycles, compute the energy for every simulation, and write to file
 void VMCSolver::InvestigateVarianceNcycles(){
     int nSimulations = 40;
     double variance;
-    int nCycles;
-
-    int n = (nCycles*nParticles);
 
     double averange_r_ij;
     double time;
 
-
     fstream outfile;
-    outfile.open("Variance_nSampels_no_imp.dat", ios::out);
+    outfile.open("Variance_nSampels_xxx.dat", ios::out);
 
     for(int i=0; i < nSimulations; i++){
         nCycles = 5000 + 1000*i;
 
         int n = (nCycles*nParticles);
-        mat positions = zeros(n, nDimensions);
+        mat positions = zeros(n*nParticles + nParticles, nDimensions);
         vec energy_single = zeros(n);
         vec energySquared_single = zeros(n);
 
         MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 
-        double energy_mean = sum(energy_single)/n;
-
-        cout << nCycles << " " << variance << " "  << energy_mean << endl;
-        outfile << nCycles << " " << variance << " "  << energy_mean << endl;
+        double energy = sum(energy_single)/n;
+        outfile << nCycles << " " << variance << " "  << energy << endl;
     }
     outfile.close();
 }
 
 
-void VMCSolver::InvestigateCPUtime(){
-    int nSimulations = 10;
-    int nCycles;
 
+// function that run MC simulations for all combinations of wavefunc and energySolver for with different number of nCycles,
+// and store all relevant data for each simulation, and write the data to file
+void VMCSolver::InvestigateCPUtime(){
+
+    int nSimulations = 10;
     double variance;
     double averange_r_ij;
     double time;
-
     mat time_values = zeros(nSimulations, 5);
 
     fstream outfile;
-    outfile.open("cpu_time.dat", ios::out);
-
+    outfile.open("cpu_time_imp.dat", ios::out);
 
     int counter = 1;
-    for(int i=1; i<=2; i++){
-        for(int j=1; j<=2; j++){
+    for(int i=2; i<=nParticles; i++){
+        for(int j=2; j<=nParticles; j++){
 
             wavefunc_selection = i;
             energySolver_selection = j;
 
-            for(int k=0; k < nSimulations; k++){
-                nCycles = 500000 + 1000000*k;
+            for(int k=0; k<nSimulations; k++){
+                nCycles = 50000 + 100000*k;
 
                 int n = (nCycles*nParticles);
-                mat positions = zeros(n, nDimensions);
+                mat positions = zeros(n*nParticles + nParticles, nDimensions);
                 vec energy_single = zeros(n);
                 vec energySquared_single = zeros(n);
 
@@ -367,44 +395,46 @@ void VMCSolver::InvestigateCPUtime(){
 
 
 
+// function that run MC simulations for different timesteps, and store all relevant data for each simulation, and write the data to file
 void VMCSolver::InvestigateTimestep(){
-    int nSimulations = 10;
 
+    nCycles = 10000000;
+
+    int nSimulations = 10;
     double variance;
     double averange_r_ij;
     double time;
 
     fstream outfile;
-    outfile.open("timestep_dependence2.dat", ios::out);
-
-    nCycles = 10000000;
+    outfile.open("timestep_dependence_xxx.dat", ios::out);
 
     int counter = 0;
     for(int i=0; i < nSimulations; i++){
         timestep = 0.001 + 0.001*i;
 
         int n = (nCycles*nParticles);
-        mat positions = zeros(n, nDimensions);
+        mat positions = zeros(n*nParticles + nParticles, nDimensions);
         vec energy_single = zeros(n);
         vec energySquared_single = zeros(n);
 
         MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 
         double energy = sum(energy_single)/n;
-        cout << timestep << " " << energy << " "  << averange_r_ij << " " << time <<  " " << nCycles << endl;
         outfile << timestep << " " << energy << " " << averange_r_ij << " " << time <<  " " << nCycles << endl;
-        cout << counter << endl;
+        cout << "counter: " << counter << endl; // counter to see progress in CPU-heavy simulation
         counter++;
-
     }
     outfile.close();
 }
 
 
+
+// function that run a MC simulation, compute and store all intermediate energy, and write the energy to file
 void VMCSolver::BlockingFunc(){
-    int nCycles = 1000000;
+
+    nCycles = 1000000;
     int n = (nCycles*nParticles);
-    mat positions = zeros(n, nDimensions);
+    mat positions = zeros(n*nParticles + nParticles, nDimensions);
     vec energy_single = zeros(n);
     vec energySquared_single = zeros(n);
     double variance;
@@ -414,8 +444,7 @@ void VMCSolver::BlockingFunc(){
     MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 
     fstream outfile;
-    outfile.open("Blocking_data_ber_imp.dat", ios::out);
-
+    outfile.open("Blocking_data_xxx.dat", ios::out);
     for(int i=0; i<n; i++){
         outfile << energy_single(i) << " " << energySquared_single(i) << endl;
     }
@@ -424,28 +453,24 @@ void VMCSolver::BlockingFunc(){
 
 
 
-
-
+// function that run a MC simulation, storing all intermediate positions for all electrons, and write the postions to file
 void VMCSolver::OnebodyDensity_ChargeDensity(){
 
     nCycles = 50000;
     int n = (nCycles*nParticles);
-    mat positions = zeros(n*nParticles+nParticles , nDimensions);
+    mat positions = zeros(n*nParticles + nParticles, nDimensions);
     vec energy_single = zeros(n);
     vec energySquared_single = zeros(n);
     double variance;
     double averange_r_ij;
     double time;
 
+    save_positions = true;
     MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 
-    double energy = sum(energy_single)/n;
-
     fstream outfile;
-    outfile.open("OnebodyDensity_ChargeDensity_beryllium_simple_imp.dat", ios::out);
-
+    outfile.open("OnebodyDensity_ChargeDensity_xxx.dat", ios::out);
     outfile << positions << endl;
-
     outfile.close();
 }
 
