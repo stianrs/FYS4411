@@ -16,14 +16,10 @@ using namespace arma;
 int main()
 {
 
+    int nCycles = 10000000;
 
-    int nCycles = 100000000;
-
-    //MCSolver *solver = new VMCSolver();
-    //solver->runMonteCarloIntegration(nCycles);
-
-    VMCSolver *investigateCPU = new VMCSolver();
-    investigateCPU->InvestigateCPUtime();
+    VMCSolver *solver = new VMCSolver();
+    solver->runMonteCarloIntegration(nCycles);
 
 /*
 

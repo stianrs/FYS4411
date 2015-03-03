@@ -357,14 +357,15 @@ void VMCSolver::InvestigateVarianceNcycles(){
 // and store all relevant data for each simulation, and write the data to file
 void VMCSolver::InvestigateCPUtime(){
 
-    int nSimulations = 10;
+    int nSimulations = 3;
     double variance;
     double averange_r_ij;
     double time;
+    int nCycles;
     mat time_values = zeros(nSimulations, 5);
 
     fstream outfile;
-    outfile.open("cpu_time_imp.dat", ios::out);
+    outfile.open("cpu_time_xxx.dat", ios::out);
 
     int counter = 1;
     for(int i=2; i<=nParticles; i++){
@@ -374,8 +375,7 @@ void VMCSolver::InvestigateCPUtime(){
             energySolver_selection = j;
 
             for(int k=0; k<nSimulations; k++){
-                nCycles = 50000 + 100000*k;
-
+                nCycles = 50000 + 1000000*k;
                 int n = (nCycles*nParticles);
                 mat positions = zeros(n*nParticles + nParticles, nDimensions);
                 vec energy_single = zeros(n);
