@@ -12,20 +12,23 @@ using namespace std;
 
 VMCSolver::VMCSolver() :
     nDimensions(3),
-    charge(2),
-    nParticles(2),
-    stepLength(1.4),
+    charge(4),
+    nParticles(4),
+    stepLength(2.7), // 1.3 2.7
     h(0.001),
     h2(1000000),
     idum(-1),
-    alpha(1.85), //alpha(1.843), 3.9
-    beta(0.35), //beta(0.347), 0.09
+    alpha(3.9), //alpha(1.843), 3.9
+    beta(0.1), //beta(0.347), 0.09
     nCycles(1000000),
-    timestep(0.01), // IS
+    timestep(0.002), // IS
     D(0.5), // IS
-    wavefunc_selection(2),
-    energySolver_selection(2),
-    deactivate_ImportanceSampling(true)
+    wavefunc_selection(3),
+    energySolver_selection(1),
+    deactivate_ImportanceSampling(false),
+
+    save_positions(true)
+
 
 {
     r_distance = zeros(nParticles, nParticles);
@@ -35,22 +38,25 @@ VMCSolver::VMCSolver() :
 void VMCSolver::runMonteCarloIntegration(int nCycles)
 {
     int n = (nCycles*nParticles);
+    mat positions = zeros(n, nParticles*nDimensions);
     vec energy_single = zeros(n);
     vec energySquared_single = zeros(n);
     double variance;
     double averange_r_ij;
     double time;
 
-    MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r_ij, time);
+    MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 }
 
 
 
-void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r_ij, double &time)
+void VMCSolver::MonteCarloIntegration(int nCycles, mat &positions, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r_ij, double &time)
 {
     fill_a_matrix();
 
     if(deactivate_ImportanceSampling){
+        cout << "Without importance sampling" << "  Wavefunc_selection: " << wavefunc_selection << "  energySolver_selection: " << energySolver_selection << endl;
+
         rOld = zeros<mat>(nParticles, nDimensions);
         rNew = zeros<mat>(nParticles, nDimensions);
 
@@ -68,8 +74,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
         double deltaE;
         int counter = 0;
 
-        stepLength = 1.4;
-        //stepLength = InvestigateOptimalStep();
+
+        //stepLength = 1.3;
+        //stepLength = 2.7;
+        stepLength = InvestigateOptimalStep();
 
         // initial trial positions
         for(int i = 0; i < nParticles; i++) {
@@ -78,6 +86,17 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
             }
         }
         rNew = rOld;
+
+
+        int pos_counter_round = 0;
+        for(int i=0; i < nParticles; i++){
+            for(int j=0; j < nDimensions; j++){
+                positions(i, j) = rNew(i, j);
+            }
+            pos_counter_round++;
+        }
+
+
 
         r_func(rNew);
         int div = nParticles*nParticles - nParticles;
@@ -131,9 +150,26 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
                 energySquared_single(counter) = deltaE*deltaE;
                 counter += 1;
 
-            }
-        }
 
+                if(save_positions){
+
+                    for(int i=0; i < nParticles; i++){
+                        for(int j=0; j < nDimensions; j++){
+                            positions(pos_counter_round, j) = rNew(i, j);
+
+                        }
+                        pos_counter_round++;
+                    }
+
+
+                }
+
+
+
+
+            }
+
+        }
 
         // Stop the clock and estimate the spent time
         finish = clock();
@@ -150,6 +186,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
     }
 
     else{
+        cout << "With importance sampling" << "  Wavefunc_selection: " << wavefunc_selection << "  energySolver_selection: " << energySolver_selection << endl;
+
         rOld = zeros<mat>(nParticles, nDimensions);
         rNew = zeros<mat>(nParticles, nDimensions);
         QForceOld = zeros<mat>(nParticles, nDimensions);
@@ -179,6 +217,15 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
             }
         }
         rNew = rOld;
+
+
+        int pos_counter_round = 0;
+        for(int i=0; i < nParticles; i++){
+            for(int j=0; j < nDimensions; j++){
+                positions(i, j) = rNew(i, j);
+            }
+            pos_counter_round++;
+        }
 
         r_func(rNew);
         int div = nParticles*nParticles - nParticles;
@@ -258,6 +305,21 @@ void VMCSolver::MonteCarloIntegration(int nCycles, vec &energy_single, vec &ener
                 energy_single(counter) = deltaE;
                 energySquared_single(counter) = deltaE*deltaE;
                 counter += 1;
+
+
+
+                if(save_positions){
+
+                    for(int i=0; i < nParticles; i++){
+                        for(int j=0; j < nDimensions; j++){
+                            positions(pos_counter_round, j) = rNew(i, j);
+
+                        }
+                        pos_counter_round++;
+                    }
+
+
+                }
             }
         }
 
@@ -498,8 +560,8 @@ void VMCSolver::fill_a_matrix(){
 
     a_matrix = zeros(nParticles, nParticles);
     double  a;
-    for(int i=0; i<nParticles; i++){
-        for(int j=0; j<nParticles; j++){
+    for(int i=0; i < nParticles; i++){
+        for(int j=0; j < nParticles; j++){
             if(spin(i) == spin(j)){
                 a = 1.0/4.0;
             }
@@ -514,10 +576,11 @@ void VMCSolver::fill_a_matrix(){
 
 double VMCSolver::JastrowFactor(){
     double Psi = 1.0;
-    for(int j=0; j<nParticles; j++){
-        for(int i=0; i<j; i++){
+    for(int j=0; j < nParticles; j++){
+        for(int i=0; i < j; i++){
             Psi *= exp((a_matrix(i,j)*r_distance(i,j))/(1.0 + beta*r_distance(i,j)));
         }
+
     }
     return Psi;
 }

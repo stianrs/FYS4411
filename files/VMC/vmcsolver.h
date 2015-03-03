@@ -12,7 +12,7 @@ public:
     VMCSolver();
 
     void runMonteCarloIntegration(int nCycles);
-    void MonteCarloIntegration(int nCycles, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r_ij, double &time);
+    void MonteCarloIntegration(int nCycles, mat &positions, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r_ij, double &time);
     void InvestigateOptimalAlpha();
     void InvestigateOptimalParameters();
     void InvestigateVarianceNcycles();
@@ -58,6 +58,7 @@ private:
     int wavefunc_selection;
     int energySolver_selection;
     bool deactivate_ImportanceSampling;
+    bool save_positions;
 
     mat rOld;
     mat rNew;

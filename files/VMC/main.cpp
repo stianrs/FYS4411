@@ -19,20 +19,23 @@ int main()
     //    double time;
 
 
-    int nCycles = 4000000;
+    int nCycles = 1000000;
 
 
     //VMCSolver *solver = new VMCSolver();
     //solver->runMonteCarloIntegration(nCycles);
 
+    //VMCSolver *investigateOnebodyDensity_ChargeDensity = new VMCSolver();
+    //investigateOnebodyDensity_ChargeDensity ->OnebodyDensity_ChargeDensity();
+
+    //VMCSolver *investigateParameters = new VMCSolver();
+    //investigateParameters->InvestigateOptimalParameters();
 
 
-    VMCSolver *Blocking = new VMCSolver();
-    Blocking->BlockingFunc();
+    //VMCSolver *Blocking = new VMCSolver();
+    //Blocking->BlockingFunc();
 
 
-    //VMCSolver *investigateTimestepDependence = new VMCSolver();
-    //investigateTimestepDependence ->InvestigateTimestep();
   /*
     VMCSolver *Blocking = new VMCSolver();
     Blocking->BlockingFunc();

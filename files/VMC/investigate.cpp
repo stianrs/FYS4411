@@ -13,6 +13,8 @@ using namespace std;
 
 double VMCSolver::InvestigateOptimalStep()
 {
+    fill_a_matrix();
+
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
 
@@ -182,6 +184,9 @@ void VMCSolver::InvestigateOptimalAlpha(){
 
 
 void VMCSolver::InvestigateOptimalParameters(){
+
+    fill_a_matrix();
+
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
 
@@ -193,22 +198,27 @@ void VMCSolver::InvestigateOptimalParameters(){
 
     double deltaE;
 
-    int nPoints = 100;
+    int nPoints = 20;
     double resolution;
 
     double optimalAlpha;
     double optimalBeta;
     double minimumEnergy = 0;
 
-    double minimum_Alpha = 1.0;
-    double maximum_Alpha = 3.0;
-    double minimum_Beta = 0.2;
-    double maximum_Beta = 0.5;
+    //double minimum_Alpha = 1.0;
+    //double maximum_Alpha = 3.0;
+    //double minimum_Beta = 0.2;
+    //double maximum_Beta = 0.5;
+
+    double minimum_Alpha = 3.8;
+    double maximum_Alpha = 4.1;
+    double minimum_Beta = 0.05;
+    double maximum_Beta = 0.15;
 
     nCycles = 100000;
 
     fstream outfile;
-    outfile.open("Parameter_Energy2.dat", ios::out);
+    outfile.open("Parameter_Energy_Beryllium.dat", ios::out);
 
     for(int alphaCounter = 1; alphaCounter < nPoints; alphaCounter++){
         resolution = (maximum_Alpha - minimum_Alpha)/nPoints;
@@ -260,8 +270,10 @@ void VMCSolver::InvestigateOptimalParameters(){
             }
 
             double energy = energySum/(nCycles * nParticles);
+            double energySquared = energySquaredSum/(nCycles * nParticles);
+            double variance = (energySquared - (energy*energy))/(nCycles * nParticles);
             //cout << "Alpha: " << alpha << " Beta: " << beta << " Energy: " << energy << endl;
-            outfile << alpha << " " << beta << " " << energy << endl;
+            outfile << alpha << " " << beta << " " << energy << " " << variance << endl;
 
             if (energy < minimumEnergy){
                 minimumEnergy = energy;
@@ -280,7 +292,7 @@ void VMCSolver::InvestigateOptimalParameters(){
 
 
 void VMCSolver::InvestigateVarianceNcycles(){
-    int nSimulations = 300;
+    int nSimulations = 40;
     double variance;
     int nCycles;
 
@@ -291,21 +303,22 @@ void VMCSolver::InvestigateVarianceNcycles(){
 
 
     fstream outfile;
-    outfile.open("Variance_nSampels2.dat", ios::out);
+    outfile.open("Variance_nSampels_no_imp.dat", ios::out);
 
     for(int i=0; i < nSimulations; i++){
-        nCycles = 10000 + 1000*i;
+        nCycles = 5000 + 1000*i;
 
         int n = (nCycles*nParticles);
+        mat positions = zeros(n, nDimensions);
         vec energy_single = zeros(n);
         vec energySquared_single = zeros(n);
 
-        MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r_ij, time);
+        MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 
         double energy_mean = sum(energy_single)/n;
 
         cout << nCycles << " " << variance << " "  << energy_mean << endl;
-        outfile << nCycles << " " << variance << endl;
+        outfile << nCycles << " " << variance << " "  << energy_mean << endl;
     }
     outfile.close();
 }
@@ -336,10 +349,11 @@ void VMCSolver::InvestigateCPUtime(){
                 nCycles = 500000 + 1000000*k;
 
                 int n = (nCycles*nParticles);
+                mat positions = zeros(n, nDimensions);
                 vec energy_single = zeros(n);
                 vec energySquared_single = zeros(n);
 
-                MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r_ij, time);
+                MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 
                 time_values(k, 0) = nCycles;
                 time_values(k, counter) = time;
@@ -354,45 +368,53 @@ void VMCSolver::InvestigateCPUtime(){
 
 
 void VMCSolver::InvestigateTimestep(){
-    int nSimulations = 30;
+    int nSimulations = 10;
 
     double variance;
     double averange_r_ij;
     double time;
 
     fstream outfile;
-    outfile.open("timestep_dependence.dat", ios::out);
+    outfile.open("timestep_dependence2.dat", ios::out);
 
+    nCycles = 10000000;
+
+    int counter = 0;
     for(int i=0; i < nSimulations; i++){
         timestep = 0.001 + 0.001*i;
 
         int n = (nCycles*nParticles);
+        mat positions = zeros(n, nDimensions);
         vec energy_single = zeros(n);
         vec energySquared_single = zeros(n);
 
-        MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r_ij, time);
+        MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 
         double energy = sum(energy_single)/n;
-        cout << timestep << " " << energy << " "  << variance << " " << averange_r_ij << " " << time << endl;
-        outfile << timestep << " " << energy << " " << variance << " "  << averange_r_ij << " " << time << endl;
+        cout << timestep << " " << energy << " "  << averange_r_ij << " " << time <<  " " << nCycles << endl;
+        outfile << timestep << " " << energy << " " << averange_r_ij << " " << time <<  " " << nCycles << endl;
+        cout << counter << endl;
+        counter++;
+
     }
     outfile.close();
 }
 
 
 void VMCSolver::BlockingFunc(){
-    int nCycles = 500000;
+    int nCycles = 1000000;
     int n = (nCycles*nParticles);
+    mat positions = zeros(n, nDimensions);
     vec energy_single = zeros(n);
     vec energySquared_single = zeros(n);
     double variance;
     double averange_r_ij;
     double time;
 
-    MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r_ij, time);
+    MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 
     fstream outfile;
-    outfile.open("Blocking_data.dat", ios::out);
+    outfile.open("Blocking_data_ber_imp.dat", ios::out);
 
     for(int i=0; i<n; i++){
         outfile << energy_single(i) << " " << energySquared_single(i) << endl;
@@ -405,24 +427,24 @@ void VMCSolver::BlockingFunc(){
 
 
 void VMCSolver::OnebodyDensity_ChargeDensity(){
+
+    nCycles = 50000;
     int n = (nCycles*nParticles);
+    mat positions = zeros(n*nParticles+nParticles , nDimensions);
     vec energy_single = zeros(n);
     vec energySquared_single = zeros(n);
     double variance;
     double averange_r_ij;
     double time;
 
-    MonteCarloIntegration(nCycles, energy_single, energySquared_single, variance, averange_r_ij, time);
+    MonteCarloIntegration(nCycles, positions, energy_single, energySquared_single, variance, averange_r_ij, time);
 
     double energy = sum(energy_single)/n;
 
-
-
     fstream outfile;
-    outfile.open("OnebodyDensity_ChargeDensity.dat", ios::out);
+    outfile.open("OnebodyDensity_ChargeDensity_beryllium_simple_imp.dat", ios::out);
 
-    cout << nCycles << " " << energy << " "  << ChargeDensity << endl;
-    outfile << nCycles << " " << energy << " "  << ChargeDensity << endl;
+    outfile << positions << endl;
 
     outfile.close();
 }
