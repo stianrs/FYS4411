@@ -18,8 +18,13 @@ int main()
 
     int nCycles = 1000000;
 
-    VMCSolver *solver = new VMCSolver();
-    solver->runMonteCarloIntegration(nCycles);
+    //VMCSolver *solver = new VMCSolver();
+    //solver->runMonteCarloIntegration(nCycles);
+
+
+    VMCSolver *investigateOnebodyDensity_ChargeDensity = new VMCSolver();
+    investigateOnebodyDensity_ChargeDensity ->OnebodyDensity_ChargeDensity();
+
 
 /*
 

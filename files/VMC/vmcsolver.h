@@ -2,8 +2,10 @@
 #define VMCSOLVER_H
 
 #include <armadillo>
+#include <fstream>
+#include <iostream>
 
-
+using namespace std;
 using namespace arma;
 
 class VMCSolver
@@ -12,7 +14,7 @@ public:
     VMCSolver();
 
     void runMonteCarloIntegration(int nCycles);
-    void MonteCarloIntegration(int nCycles, mat &positions, vec &energy_single, vec &energySquared_single, double &variance, double &averange_r_ij, double &time);
+    void MonteCarloIntegration(int nCycles, fstream &outfile);
     void InvestigateOptimalAlpha();
     void InvestigateOptimalParameters();
     void InvestigateVarianceNcycles();
@@ -21,10 +23,12 @@ public:
     void BlockingFunc();
     void OnebodyDensity_ChargeDensity();
 
+
 private:
     double waveFunction(const mat &r);
     double localEnergy(const mat &r);
     void r_func(const mat &positions);
+    void save_positions_func(const mat &r, fstream &outfile);
     double InvestigateOptimalStep();
     void QuantumForce(const mat &r, mat &F);
     double psi1s(double &r);
@@ -67,6 +71,13 @@ private:
     mat r_distance;
     mat a_matrix;
     vec r_centre;
+
+    vec energy_single;
+    vec energySquared_single;
+    double variance;
+    double averange_r_ij;
+    double time;
+
 };
 
 
