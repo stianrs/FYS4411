@@ -34,6 +34,7 @@ private:
     void QuantumForce(const mat &r, mat &F);
     double psi1s(double &r);
     double psi2s(double &r);
+    double psi2p(double &r);
     void fill_a_matrix();
     double JastrowFactor();
     double SlaterDeterminant();

@@ -574,6 +574,13 @@ double VMCSolver::psi2s(double &r){
     return psi2s;
 }
 
+// 2p hydrogenic orbital
+double VMCSolver::psi2p(double &r){
+    double psi2p;
+    psi2p = alpha*r*exp(-alpha*r/2.0);
+    return psi2p;
+}
+
 // set up spinns and compute the a-matrix
 void VMCSolver::fill_a_matrix(){
     vec spin = zeros(nParticles);
@@ -611,7 +618,7 @@ double VMCSolver::JastrowFactor(){
     return Psi;
 }
 
-// compoue the Slater determinant for Beryllium
+// compute the Slater determinant for Beryllium
 double VMCSolver::SlaterDeterminant(){
     vec argument = zeros(nParticles);
 
