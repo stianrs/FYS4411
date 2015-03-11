@@ -14,25 +14,21 @@ This is the program with the MC solver both with and without importrance samplin
 using namespace arma;
 using namespace std;
 
-VMCSolver::VMCSolver() :
+VMCSolver::VMCSolver():
+    AtomType("helium"),
     nDimensions(3),
-    charge(2),
-    nParticles(2),
-    stepLength(1.3), // is set automatic in the solver, helium: 1.3, beryllium: 2.7
-    h(0.001),
-    h2(1000000),
-    idum(-1), // random number seed
-    alpha(1.85), // helium: 1.85, bryllium: 3.9
-    beta(0.35), // helium: 0.35, beryllium: 0.1
-    nCycles(1000000), // number of MC cycles, (not used!)
+
+    energySolver_selection(2), // =1 use numerical integration, =2 to use analytical expressions
+
+    deactivate_JastrowFactor(false), // set false to activate importance sampling
+    deactivate_ImportanceSampling(true), // set false to activate importance sampling
+    save_positions(false), // set true to save all intermediate postitions in an MC simulation
+
     timestep(0.002), // timestep used in importance sampling
     D(0.5), // constant used with importance sampling
-    wavefunc_selection(2), // =1 helium hydrogenic, =2, helium Jastrow, =3 beryllium hydrogenic, =4 beryllium Jastrow
-    energySolver_selection(2), // =1 use numerical integration, =2 to use analytical expressions
-    deactivate_ImportanceSampling(true), // set false to activate importance sampling
 
-    save_positions(false) // set true to save all intermediate postitions in an MC simulation
-
+    h(0.001), // step used in numerical integration
+    h2(1000000) // 1/h^2 used in numerical integration
 
 {
     r_distance = zeros(nParticles, nParticles); // distance between electrons
@@ -47,15 +43,35 @@ void VMCSolver::runMonteCarloIntegration(int nCycles)
 }
 
 
+void VMCSolver::SetParametersAtomType(string AtomType){
+    if (AtomType == "helium"){
+        charge = 2;
+        nParticles = 2;
+        alpha = 1.85;
+        beta = 0.35;
+    }
+    else if(AtomType == "beryllium"){
+        charge = 4;
+        nParticles = 4;
+        alpha = 3.9;
+        beta = 0.1;
+    }
+}
+
+
 // The Monte Carlo solver both with and without importance sampling
 void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 {
+    SetParametersAtomType(AtomType);
 
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
 
+    // random seed in random number generator
+    time_t idum = time(0);
+
     if(deactivate_ImportanceSampling){
-        cout << "Without importance sampling" << "  Wavefunc_selection: " << wavefunc_selection << "  energySolver_selection: " << energySolver_selection << endl;
+        cout << "Without importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << energySolver_selection << endl;
 
         int n = nCycles*nParticles;
 
@@ -79,8 +95,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         int counter = 0;
         int counter2 = 0;
         double acceptCounter = 0;
-
-        vec positions = zeros(nParticles*nDimensions);
 
         stepLength = InvestigateOptimalStep();
 
@@ -165,7 +179,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
         // Stop the clock and estimate the spent time
         finish = clock();
-        time = ((finish - start)/((double) CLOCKS_PER_SEC));
+        cpu_time = ((finish - start)/((double) CLOCKS_PER_SEC));
 
         double energy_mean = energySum/n;
         double energySquared_mean = energySquaredSum/n;
@@ -174,11 +188,11 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         averange_r_ij = r_ij_sum/r_ij_counter;
 
         cout << "Energy: " << energy_mean << " Variance: " << variance <<  " Averange distance r_ij: " << r_ij_sum/r_ij_counter << endl;
-        cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << time << " sec" << endl;
+        cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << cpu_time << " sec" << endl;
     }
 
     else{
-        cout << "With importance sampling" << "  Wavefunc_selection: " << wavefunc_selection << "  energySolver_selection: " << energySolver_selection << endl;
+        cout << "With importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << energySolver_selection << endl;
 
         int n = nCycles*nParticles;
 
@@ -310,7 +324,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
         // Stop the clock and estimate the spent time
         finish = clock();
-        time = ((finish - start)/((double) CLOCKS_PER_SEC));
+        cpu_time = ((finish - start)/((double) CLOCKS_PER_SEC));
 
         double energy_mean = energySum/n;
         double energySquared_mean = energySquaredSum/n;
@@ -319,7 +333,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         averange_r_ij = r_ij_sum/r_ij_counter;
 
         cout << "Energy: " << energy_mean << " Variance: " << variance <<  " Averange distance r_ij: " << r_ij_sum/r_ij_counter << endl;
-        cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << time << " sec" << endl;
+        cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << cpu_time << " sec" << endl;
     }
 }
 
@@ -407,7 +421,7 @@ double VMCSolver::localEnergy(const mat &r)
 
         EL1 = (alpha - charge)*((1.0/r1) + (1.0/r2)) + (1.0/r12) - (alpha*alpha);
 
-        if (wavefunc_selection == 1){
+        if (deactivate_JastrowFactor == 1){
             return EL1;
         }
 
@@ -424,52 +438,55 @@ double VMCSolver::localEnergy(const mat &r)
 double VMCSolver::waveFunction(const mat &r)
 {
 
-    if (wavefunc_selection == 1){
-        double argument = 0;
-        for(int i = 0; i < nParticles; i++) {
-            double rSingleParticle = 0;
-            for(int j = 0; j < nDimensions; j++) {
-                rSingleParticle += r(i,j) * r(i,j);
+    if (AtomType == "helium"){
+        if (deactivate_JastrowFactor){
+            double argument = 0;
+            for(int i = 0; i < nParticles; i++) {
+                double rSingleParticle = 0;
+                for(int j = 0; j < nDimensions; j++) {
+                    rSingleParticle += r(i,j) * r(i,j);
+                }
+                argument += sqrt(rSingleParticle);
             }
-            argument += sqrt(rSingleParticle);
+            return exp(-argument * alpha);
         }
-        return exp(-argument * alpha);
-    }
 
-    if (wavefunc_selection == 2){
-        r_func(r);
-        int div = nParticles*nParticles - nParticles;
-        double r12 = sum(sum(r_distance))/div;
+        if (deactivate_JastrowFactor == false){
+            r_func(r);
+            int div = nParticles*nParticles - nParticles;
+            double r12 = sum(sum(r_distance))/div;
 
-        double argument = 0;
-        for(int i = 0; i < nParticles; i++) {
-            double rSingleParticle = 0;
-            for(int j = 0; j < nDimensions; j++) {
-                rSingleParticle += r(i,j) * r(i,j);
+            double argument = 0;
+            for(int i = 0; i < nParticles; i++) {
+                double rSingleParticle = 0;
+                for(int j = 0; j < nDimensions; j++) {
+                    rSingleParticle += r(i,j) * r(i,j);
+                }
+                argument += sqrt(rSingleParticle);
             }
-            argument += sqrt(rSingleParticle);
+            return exp(-argument * alpha)*exp(r12/(2*(1.0 + beta*r12)));
         }
-        return exp(-argument * alpha)*exp(r12/(2*(1.0 + beta*r12)));
     }
 
+    else if (AtomType == "beryllium"){
+        if (deactivate_JastrowFactor){
+            r_func(r);
 
-    if (wavefunc_selection == 3){
-        r_func(r);
+            double hydrogenic = SlaterDeterminant();
+            return hydrogenic;
+        }
 
-        double hydrogenic = SlaterDeterminant();
-        return hydrogenic;
-    }
+        if (deactivate_JastrowFactor == false){
+            r_func(r);
 
-    if (wavefunc_selection == 4){
-        r_func(r);
+            double factor = JastrowFactor();
+            double hydrogenic = SlaterDeterminant();
+            return hydrogenic*factor;
+        }
 
-        double factor = JastrowFactor();
-        double hydrogenic = SlaterDeterminant();
-        return hydrogenic*factor;
-    }
-
-    else{
-        exit(0);
+        else{
+            exit(0);
+        }
     }
 }
 

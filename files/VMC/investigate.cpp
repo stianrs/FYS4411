@@ -17,10 +17,15 @@ using namespace std;
 
 
 // algorithm to find a steplength that gives an acceptance ratio about 0.5
-double VMCSolver::InvestigateOptimalStep()
-{
+double VMCSolver::InvestigateOptimalStep(){
+
+    SetParametersAtomType(AtomType);
+
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
+
+    // random seed in random number generator
+    time_t idum = time(0);
 
     nCycles = 1000000;
 
@@ -115,8 +120,13 @@ double VMCSolver::InvestigateOptimalStep()
 // energy, write to file, and print out the optimal alpha with correponding energy
 void VMCSolver::InvestigateOptimalAlpha(){
 
+    SetParametersAtomType(AtomType);
+
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
+
+    // random seed in random number generator
+    time_t idum = time(0);
 
     nCycles = 100000;
     int nPoints = 100;
@@ -206,8 +216,13 @@ void VMCSolver::InvestigateOptimalAlpha(){
 // energy, write to file, and print out the optimal set of parameters with correponding energy
 void VMCSolver::InvestigateOptimalParameters(){
 
+    SetParametersAtomType(AtomType);
+
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
+
+    // random seed in random number generator
+    time_t idum = time(0);
 
     nCycles = 100000;
     int nPoints = 100;
@@ -360,7 +375,7 @@ void VMCSolver::InvestigateCPUtime(){
     for(int i=2; i<=nParticles; i++){
         for(int j=2; j<=nParticles; j++){
 
-            wavefunc_selection = i;
+            deactivate_JastrowFactor = i;
             energySolver_selection = j;
 
             for(int k=0; k<nSimulations; k++){
@@ -369,7 +384,7 @@ void VMCSolver::InvestigateCPUtime(){
                 MonteCarloIntegration(nCycles, outfile);
 
                 time_values(k, 0) = nCycles;
-                time_values(k, counter) = time;
+                time_values(k, counter) = cpu_time;
             }
             counter++;
         }
@@ -399,7 +414,7 @@ void VMCSolver::InvestigateTimestep(){
         MonteCarloIntegration(nCycles, outfile);
 
         double energy = sum(energy_single)/n;
-        outfile << timestep << " " << energy << " " << averange_r_ij << " " << time <<  " " << nCycles << endl;
+        outfile << timestep << " " << energy << " " << averange_r_ij << " " << cpu_time <<  " " << nCycles << endl;
         cout << "counter: " << counter << endl; // counter to see progress in CPU-heavy simulation
         counter++;
     }

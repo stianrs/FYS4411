@@ -25,6 +25,7 @@ public:
 
 
 private:
+    void SetParametersAtomType(string AtomType);
     double waveFunction(const mat &r);
     double localEnergy(const mat &r);
     void r_func(const mat &positions);
@@ -37,32 +38,32 @@ private:
     double JastrowFactor();
     double SlaterDeterminant();
 
+    string AtomType;
+
     int nDimensions;
-    int charge;
-    int nParticles;
-    double stepLength;
 
-    double h;
-    double h2;
-
-    long idum;
-
-    double alpha;
-    double beta;
-
-    int nCycles;
+    int energySolver_selection;
+    bool deactivate_JastrowFactor;
+    bool deactivate_ImportanceSampling;
+    bool save_positions;
 
     //  we fix the time step  for the gaussian deviate
     double timestep;
     // diffusion constant from Schroedinger equation
     double D;
+
+    double h;
+    double h2;
+
+    int charge;
+    int nParticles;
+
+    double alpha;
+    double beta;
+
+    double stepLength;
+    int nCycles;
     double GreensFunction;
-
-
-    int wavefunc_selection;
-    int energySolver_selection;
-    bool deactivate_ImportanceSampling;
-    bool save_positions;
 
     mat rOld;
     mat rNew;
@@ -76,7 +77,7 @@ private:
     vec energySquared_single;
     double variance;
     double averange_r_ij;
-    double time;
+    double cpu_time;
 
 };
 
