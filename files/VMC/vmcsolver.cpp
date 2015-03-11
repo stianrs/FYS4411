@@ -18,14 +18,15 @@ VMCSolver::VMCSolver():
     AtomType("helium"),
     nDimensions(3),
 
-    energySolver_selection(2), // =1 use numerical integration, =2 to use analytical expressions
+    numerical_energySolver(false), // set true to solve integral numerical
 
     deactivate_JastrowFactor(false), // set false to activate importance sampling
     deactivate_ImportanceSampling(true), // set false to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
 
     timestep(0.002), // timestep used in importance sampling
-    D(0.5), // constant used with importance sampling
+    D(0.5), // constant used in importance sampling
+    stepLength(1.0), // set to optimal value in MC function
 
     h(0.001), // step used in numerical integration
     h2(1000000) // 1/h^2 used in numerical integration
@@ -71,7 +72,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     time_t idum = time(0);
 
     if(deactivate_ImportanceSampling){
-        cout << "Without importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << energySolver_selection << endl;
+        cout << "Without importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << numerical_energySolver << endl;
 
         int n = nCycles*nParticles;
 
@@ -192,7 +193,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     }
 
     else{
-        cout << "With importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << energySolver_selection << endl;
+        cout << "With importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << numerical_energySolver << endl;
 
         int n = nCycles*nParticles;
 
@@ -344,7 +345,7 @@ double VMCSolver::localEnergy(const mat &r)
 {
 
     // numerical computation of local energy
-    if (energySolver_selection == 1){
+    if (numerical_energySolver){
 
         mat rPlus = zeros<mat>(nParticles, nDimensions);
         mat rMinus = zeros<mat>(nParticles, nDimensions);
@@ -398,37 +399,43 @@ double VMCSolver::localEnergy(const mat &r)
     // analytical expressions for local energy
     else {
 
-        double r1;
-        double r2;
-        double r1_sum = 0;
-        double r2_sum = 0;
-        double r1_vec_r2_vec = 0;
+        if (AtomType == "helium"){
+            double r1;
+            double r2;
+            double r1_sum = 0;
+            double r2_sum = 0;
+            double r1_vec_r2_vec = 0;
 
-        double EL1 = 0;
-        double EL2 = 0;
-        double compact_fraction;
+            double EL1 = 0;
+            double EL2 = 0;
+            double compact_fraction;
 
-        r_func(r);
-        int div = nParticles*nParticles - nParticles;
-        double r12 = sum(sum(r_distance))/div;
-        for(int i = 0; i < nDimensions; i++){
-            r1_sum += r(0, i)*r(0, i);
-            r2_sum += r(1, i)*r(1, i);
-            r1_vec_r2_vec += r(0, i)*r(1, i);
+            r_func(r);
+            int div = nParticles*nParticles - nParticles;
+            double r12 = sum(sum(r_distance))/div;
+            for(int i = 0; i < nDimensions; i++){
+                r1_sum += r(0, i)*r(0, i);
+                r2_sum += r(1, i)*r(1, i);
+                r1_vec_r2_vec += r(0, i)*r(1, i);
+            }
+            r1 = sqrt(r1_sum);
+            r2 = sqrt(r2_sum);
+
+            EL1 = (alpha - charge)*((1.0/r1) + (1.0/r2)) + (1.0/r12) - (alpha*alpha);
+
+            if (deactivate_JastrowFactor){
+                return EL1;
+            }
+
+            else {
+                compact_fraction = 1.0/(2*(1.0 + beta*r12)*(1.0 + beta*r12));
+                EL2 = EL1 + compact_fraction*((alpha*(r1 + r2)/r12)*(1.0 - (r1_vec_r2_vec)/(r1*r2)) - compact_fraction - 2.0/r12 + (2.0*beta)/(1.0 + beta*r12));
+                return EL2;
+            }
         }
-        r1 = sqrt(r1_sum);
-        r2 = sqrt(r2_sum);
-
-        EL1 = (alpha - charge)*((1.0/r1) + (1.0/r2)) + (1.0/r12) - (alpha*alpha);
-
-        if (deactivate_JastrowFactor == 1){
-            return EL1;
-        }
-
-        else {
-            compact_fraction = 1.0/(2*(1.0 + beta*r12)*(1.0 + beta*r12));
-            EL2 = EL1 + compact_fraction*((alpha*(r1 + r2)/r12)*(1.0 - (r1_vec_r2_vec)/(r1*r2)) - compact_fraction - 2.0/r12 + (2.0*beta)/(1.0 + beta*r12));
-            return EL2;
+        else{
+            cout << "You need to implement an analytical expression!" << endl;
+            exit(0);
         }
     }
 }

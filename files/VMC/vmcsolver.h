@@ -42,7 +42,7 @@ private:
 
     int nDimensions;
 
-    int energySolver_selection;
+    bool numerical_energySolver;
     bool deactivate_JastrowFactor;
     bool deactivate_ImportanceSampling;
     bool save_positions;
@@ -51,6 +51,7 @@ private:
     double timestep;
     // diffusion constant from Schroedinger equation
     double D;
+    double stepLength;
 
     double h;
     double h2;
@@ -61,7 +62,6 @@ private:
     double alpha;
     double beta;
 
-    double stepLength;
     int nCycles;
     double GreensFunction;
 

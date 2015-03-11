@@ -376,7 +376,7 @@ void VMCSolver::InvestigateCPUtime(){
         for(int j=2; j<=nParticles; j++){
 
             deactivate_JastrowFactor = i;
-            energySolver_selection = j;
+            numerical_energySolver = j;
 
             for(int k=0; k<nSimulations; k++){
                 nCycles = 50000 + 1000000*k;
