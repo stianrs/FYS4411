@@ -350,8 +350,8 @@ void VMCSolver::InvestigateVarianceNcycles(){
 void VMCSolver::InvestigateCPUtime(){
 
     int nSimulations = 3;
-    int nCycles;
-    mat time_values = zeros(nSimulations, 5);
+    int nCycles; // ????  ask for help
+    mat time_values = zeros(nSimulations, 2);
 
     fstream outfile;
     outfile.open("cpu_time_xxx.dat", ios::out);

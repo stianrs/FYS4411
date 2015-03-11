@@ -22,9 +22,11 @@ int main()
     //solver->runMonteCarloIntegration(nCycles);
 
 
-    VMCSolver *investigateOnebodyDensity_ChargeDensity = new VMCSolver();
-    investigateOnebodyDensity_ChargeDensity ->OnebodyDensity_ChargeDensity();
+    //VMCSolver *investigateOnebodyDensity_ChargeDensity = new VMCSolver();
+    //investigateOnebodyDensity_ChargeDensity ->OnebodyDensity_ChargeDensity();
 
+    VMCSolver *investigateCPU = new VMCSolver();
+    investigateCPU->InvestigateCPUtime();
 
 /*
 

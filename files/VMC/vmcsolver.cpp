@@ -42,7 +42,6 @@ VMCSolver::VMCSolver() :
 // function to run MC simualtions form main.cpp
 void VMCSolver::runMonteCarloIntegration(int nCycles)
 {
-
     fstream outfile;
     MonteCarloIntegration(nCycles, outfile);
 }
@@ -467,6 +466,10 @@ double VMCSolver::waveFunction(const mat &r)
         double factor = JastrowFactor();
         double hydrogenic = SlaterDeterminant();
         return hydrogenic*factor;
+    }
+
+    else{
+        exit(0);
     }
 }
 
