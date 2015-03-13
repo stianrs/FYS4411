@@ -18,9 +18,9 @@ VMCSolver::VMCSolver():
     AtomType("helium"),
     nDimensions(3),
 
-    numerical_energySolver(false), // set true to solve integral numerical
+    numerical_energySolver(true), // set true to solve integral numerical
 
-    deactivate_JastrowFactor(false), // set false to activate importance sampling
+    deactivate_JastrowFactor(true), // set false to activate importance sampling
     deactivate_ImportanceSampling(true), // set false to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
 
@@ -33,7 +33,7 @@ VMCSolver::VMCSolver():
 
 {
     r_distance = zeros(nParticles, nParticles); // distance between electrons
-    r_centre = zeros(nParticles); // distance between nucleus and electrons
+    r_radius = zeros(nParticles); // distance between nucleus and electrons
 }
 
 // function to run MC simualtions form main.cpp
@@ -444,7 +444,6 @@ double VMCSolver::localEnergy(const mat &r)
 // function that compute wavefunctions given with to compute bu user
 double VMCSolver::waveFunction(const mat &r)
 {
-
     if (AtomType == "helium"){
         if (deactivate_JastrowFactor){
             double argument = 0;
@@ -516,7 +515,7 @@ void VMCSolver::r_func(const mat &positions){
             radius(i) = sqrt(r_position);
         }
         r_distance = distance;
-        r_centre = radius;
+        r_radius = radius;
     }
 }
 
@@ -560,63 +559,6 @@ void VMCSolver::QuantumForce(const mat &r, mat &QForce)
 }
 
 
-// 1s hydrogenic orbital
-double VMCSolver::psi1s(double &distance){
-    double psi1s;
-    psi1s = exp(-alpha*distance);
-    return psi1s;
-}
-
-// 2s hydrogenic orbital
-double VMCSolver::psi2s(double &distance){
-    double psi2s;
-    psi2s = (1.0 - alpha*distance/2.0)*exp(-alpha*distance/2.0);
-    return psi2s;
-}
-
-// 2px hydrogenic orbital
-double VMCSolver::psi2px(double &positions, double &distance, int i){
-    double psi2px;
-    psi2px = alpha*positions*exp(-alpha*distance/2.0);
-    return psi2px;
-}
-
-// 2py hydrogenic orbital
-double VMCSolver::psi2py(double &positions, double &distance, int i){
-    double psi2py;
-    psi2py = alpha*positions*exp(-alpha*distance/2.0);
-    return psi2py;
-}
-
-// 2pz hydrogenic orbital
-double VMCSolver::psi2pz(double &positions, double &distance, int i){
-    double psi2pz;
-    psi2pz = alpha*positions*exp(-alpha*distance/2.0);
-    return psi2pz;
-}
-
-
-double VMCSolver::SlaterPsi(mat &positions, mat &distance, int i, int j){
-
-    if(j == 0){
-        psi1s = exp(-alpha*distance);
-    }
-    else if(j == 1){
-        return psi2s = (1.0 - alpha*distance/2.0)*exp(-alpha*distance/2.0);
-    }
-    else if(j == 2){
-        psi2px = alpha*positions*exp(-alpha*distance/2.0);
-    }
-    else if(j == 3){
-        psi2py = alpha*positions*exp(-alpha*distance/2.0);
-    }
-    else if(j == 4){
-        psi2pz = alpha*positions*exp(-alpha*distance/2.0);
-    }
-    else{
-        return 0;
-    }
-}
 
 
 // set up spinns and compute the a-matrix
@@ -635,10 +577,10 @@ void VMCSolver::fill_a_matrix(){
     for(int i=0; i < nParticles; i++){
         for(int j=0; j < nParticles; j++){
             if(spin(i) == spin(j)){
-                a = 1.0/4.0;
+                a = 0.25;
             }
             else{
-                a = 1.0/2.0;
+                a = 0.5;
             }
             a_matrix(i,j) = a;
         }
@@ -656,27 +598,268 @@ double VMCSolver::JastrowFactor(){
     return Psi;
 }
 
-// compute the Slater determinant for Beryllium
-double VMCSolver::SlaterDeterminant(){
-    vec argument = zeros(nParticles);
 
-    argument = r_centre;
+// 1s hydrogenic orbital
+double VMCSolver::psi1s(double &radius){
+    double psi1s;
+    psi1s = exp(-alpha*radius);
+    return psi1s;
+}
+
+// 2s hydrogenic orbital
+double VMCSolver::psi2s(double &radius){
+    double psi2s;
+    psi2s = (1.0 - alpha*radius/2.0)*exp(-alpha*radius/2.0);
+    return psi2s;
+}
+
+// 2px hydrogenic orbital
+double VMCSolver::psi2px(double &positions, double &radius){
+    double psi2px;
+    psi2px = alpha*positions*exp(-alpha*radius/2.0);
+    return psi2px;
+}
+
+// 2py hydrogenic orbital
+double VMCSolver::psi2py(double &positions, double &radius){
+    double psi2py;
+    psi2py = alpha*positions*exp(-alpha*radius/2.0);
+    return psi2py;
+}
+
+// 2pz hydrogenic orbital
+double VMCSolver::psi2pz(double &positions, double &radius){
+    double psi2pz;
+    psi2pz = alpha*positions*exp(-alpha*radius/2.0);
+    return psi2pz;
+}
+
+
+double VMCSolver::SlaterPsi(const mat &r, int i, int j){
+
+    double positions;
+    double radius;
+
+    r_func(r);
+    radius = r_radius(i);
+
+    if(j == 0){
+        return psi1s(radius);
+    }
+    else if(j == 1){
+        return psi2s(radius);
+    }
+    else if(j == 2){
+        positions = r(i, 0);
+        return psi2px(positions, radius);
+    }
+    else if(j == 3){
+        positions = r(i, 1);
+        return psi2py(positions, radius);
+    }
+    else if(j == 4){
+        positions = r(i, 2);
+        return psi2pz(positions, radius);
+    }
+    else{
+        return 0;
+    }
+}
+
+
+// compute the Slater determinant
+void VMCSolver::SlaterDeterminant(const mat &r, mat &D_up_inv, mat &D_down_inv){
     mat D_up = zeros(nParticles/2, nParticles/2);
     mat D_down = zeros(nParticles/2, nParticles/2);
 
+    // compute spinn up part and spin down part
     for(int j=0; j<nParticles/2; j++){
-        if(j==0){
-
-        }
         for(int i=0; i<nParticles/2; i++){
-
-
-            D_up(i,j) =
+            D_up(i,j) = SlaterPsi(r, i, j);
+            D_down(i,j) = SlaterPsi(r, i+nParticles/2, j);
         }
     }
-
-    return wf;
+    D_up_inv = inv(D_up);
+    D_down_inv = inv(D_down);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Code under this are not completed
+
+
+
+
+// compute the R_sd ratio
+void VMCSolver::R_sd(const mat &r_new, const mat &r_cur){
+    mat D_up_inv = zeros(nParticles/2, nParticles/2);
+    mat D_down_inv = zeros(nParticles/2, nParticles/2);
+
+    SlaterDeterminant(r_cur, D_up_inv, D_down_inv);
+
+    double R_sd_up = 0.0;
+    double R_sd_down = 0.0;
+
+    for(int i=0; i<nParticles/2; i++){
+        for(int j=0; j<nParticles/2; j++){
+            R_sd_up += SlaterPsi(r_new, i, j)*D_up_inv(j, i);
+            R_sd_down += SlaterPsi(r_new, i+nParticles/2, j)*D_down_inv(j, i);
+        }
+    }
+    // ??? What to to next with this? Should I split up in two functions or take in R_sd as argument
+}
+
+
+
+
+// compute slater first derivative
+void VMCSolver::Slater_first_derivative(const mat &r){
+    mat D_up_inv = zeros(nParticles/2, nParticles/2);
+    mat D_down_inv = zeros(nParticles/2, nParticles/2);
+
+    SlaterDeterminant(r, D_up_inv, D_down_inv);
+
+    double derivative_up = 0.0;
+    double derivative_down = 0.0;
+
+    for(int i=0; i<nParticles/2; i++){
+        for(int j=0; j<nParticles/2; j++){
+            derivative_up += Psi_first_derivative(r, i, j)*D_up_inv(j, i);
+            derivative_down += Psi_first_derivative(r, i+nParticles/2, j)*D_down_inv(j, i);
+        }
+    }
+}
+
+
+
+
+// compute slater second derivative
+void VMCSolver::Slater_second_derivative(const mat &r){
+    mat D_up_inv = zeros(nParticles/2, nParticles/2);
+    mat D_down_inv = zeros(nParticles/2, nParticles/2);
+
+    SlaterDeterminant(r, D_up_inv, D_down_inv);
+
+    double derivative_up = 0.0;
+    double derivative_down = 0.0;
+
+    for(int i=0; i<nParticles/2; i++){
+        for(int j=0; j<nParticles/2; j++){
+            derivative_up += Psi_second_derivative(r, i, j)*D_up_inv(j, i);
+            derivative_down += Psi_second_derivative(r, i+nParticles/2, j)*D_down_inv(j, i);
+        }
+    }
+}
+
+
+
+
+
+
+// ??? SET IN EXPRESSIONS!!!
+double VMCSolver::Psi_first_derivative(const mat &r, int i, int j){
+
+    double positions;
+    double radius;
+
+    r_func(r);
+    radius = r_radius(i);
+
+    if(j == 0){
+        return psi1s(radius);
+    }
+    else if(j == 1){
+        return psi2s(radius);
+    }
+    else if(j == 2){
+        positions = r(i, 0);
+        return psi2px(positions, radius);
+    }
+    else if(j == 3){
+        positions = r(i, 1);
+        return psi2py(positions, radius);
+    }
+    else if(j == 4){
+        positions = r(i, 2);
+        return psi2pz(positions, radius);
+    }
+    else{
+        return 0;
+    }
+}
+
+// ??? SET IN EXPRESSIONS!!!
+double VMCSolver::Psi_second_derivative(const mat &r, int i, int j){
+
+    double positions;
+    double radius;
+
+    r_func(r);
+    radius = r_radius(i);
+
+    if(j == 0){
+        return psi1s(radius);
+    }
+    else if(j == 1){
+        return psi2s(radius);
+    }
+    else if(j == 2){
+        positions = r(i, 0);
+        return psi2px(positions, radius);
+    }
+    else if(j == 3){
+        positions = r(i, 1);
+        return psi2py(positions, radius);
+    }
+    else if(j == 4){
+        positions = r(i, 2);
+        return psi2pz(positions, radius);
+    }
+    else{
+        return 0;
+    }
+}
+
+
+
+
+
+
+// compute the Slater determinant
+void VMCSolver::SlaterUpdating(const mat &r, mat &D_up_inv, mat &D_down_inv){
+    mat D_up_inv_new = zeros(nParticles/2, nParticles/2);
+    mat D_down_inv_new = zeros(nParticles/2, nParticles/2);
+
+    // compute spinn up part and spin down part
+    for(int j=0; j<nParticles/2; j++){
+        for(int i=0; i<nParticles/2; i++){
+            D_up(i,j) = SlaterPsi(r, i, j);
+            D_down(i,j) = SlaterPsi(r, i+nParticles/2, j);
+        }
+    }
+    D_up_inv = inv(D_up);
+    D_down_inv = inv(D_down);
+}
+
+
+
+
+
+
+
+
+
+
 
 
 

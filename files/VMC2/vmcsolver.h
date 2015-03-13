@@ -32,15 +32,16 @@ private:
     void save_positions_func(const mat &r, fstream &outfile);
     double InvestigateOptimalStep();
     void QuantumForce(const mat &r, mat &F);
-    double psi1s(double &distance);
-    double psi2s(double &distance);
-    double psi2px(double &positions, double &distance, int i);
-    double psi2py(double &positions, double &distance, int i);
-    double psi2pz(double &positions, double &distance, int i);
+    double psi1s(double &radius);
+    double psi2s(double &radius);
+    double psi2px(double &positions, double &radius);
+    double psi2py(double &positions, double &radius);
+    double psi2pz(double &positions, double &radius);
 
     void fill_a_matrix();
     double JastrowFactor();
-    double SlaterDeterminant();
+    double SlaterPsi(mat &positions, int i, int j);
+    void SlaterDeterminant(mat &D_up_inv, mat &D_down_inv);
 
     string AtomType;
 
@@ -75,7 +76,7 @@ private:
     mat QForceNew;
     mat r_distance;
     mat a_matrix;
-    vec r_centre;
+    vec r_radius;
 
     vec energy_single;
     vec energySquared_single;
