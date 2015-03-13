@@ -833,22 +833,30 @@ double VMCSolver::Psi_second_derivative(const mat &r, int i, int j){
 
 
 
-
-
-// compute the Slater determinant
+// Not at all completed
+// update Slater determinant effectively
 void VMCSolver::SlaterUpdating(const mat &r, mat &D_up_inv, mat &D_down_inv){
     mat D_up_inv_new = zeros(nParticles/2, nParticles/2);
     mat D_down_inv_new = zeros(nParticles/2, nParticles/2);
 
-    // compute spinn up part and spin down part
-    for(int j=0; j<nParticles/2; j++){
-        for(int i=0; i<nParticles/2; i++){
-            D_up(i,j) = SlaterPsi(r, i, j);
-            D_down(i,j) = SlaterPsi(r, i+nParticles/2, j);
+    double D_sum = 0.0;
+
+    for(int k=0; k<nParticles/2; k++){
+        for(int j=0; j<nParticles/2; j++){
+            for(int i=0; i<nParticles/2; i++){
+                if(j != i){
+                    D_up_inv_new(k,j) = D_up_inv(k,j) - D_up_inv(k,j)/R*
+
+                }
+                else{
+
+
+
+                }
+            }
         }
     }
-    D_up_inv = inv(D_up);
-    D_down_inv = inv(D_down);
+
 }
 
 

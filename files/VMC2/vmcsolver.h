@@ -40,8 +40,8 @@ private:
 
     void fill_a_matrix();
     double JastrowFactor();
-    double SlaterPsi(mat &positions, int i, int j);
-    void SlaterDeterminant(mat &D_up_inv, mat &D_down_inv);
+    double SlaterPsi(const mat &positions, int i, int j);
+    void SlaterDeterminant(const mat &r, mat &D_up_inv, mat &D_down_inv);
 
     string AtomType;
 
