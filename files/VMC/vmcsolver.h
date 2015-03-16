@@ -56,6 +56,7 @@ private:
 
     double h;
     double h2;
+    time_t idum;
 
     int charge;
     int nParticles;

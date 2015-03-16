@@ -24,9 +24,6 @@ double VMCSolver::InvestigateOptimalStep(){
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
 
-    // random seed in random number generator
-    time_t idum = time(0);
-
     nCycles = 1000000;
 
     rOld = zeros<mat>(nParticles, nDimensions);
@@ -125,9 +122,6 @@ void VMCSolver::InvestigateOptimalAlpha(){
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
 
-    // random seed in random number generator
-    time_t idum = time(0);
-
     nCycles = 100000;
     int nPoints = 100;
     int n = nCycles*nParticles;
@@ -220,9 +214,6 @@ void VMCSolver::InvestigateOptimalParameters(){
 
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
-
-    // random seed in random number generator
-    time_t idum = time(0);
 
     nCycles = 100000;
     int nPoints = 100;

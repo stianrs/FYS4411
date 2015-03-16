@@ -29,7 +29,8 @@ VMCSolver::VMCSolver():
     stepLength(1.0), // set to optimal value in MC function
 
     h(0.001), // step used in numerical integration
-    h2(1000000) // 1/h^2 used in numerical integration
+    h2(1000000), // 1/h^2 used in numerical integration
+    idum(time(0)) // random number generator, seed=time(0) for random seed
 
 {
     r_distance = zeros(nParticles, nParticles); // distance between electrons
@@ -67,9 +68,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
-
-    // random seed in random number generator
-    time_t idum = time(0);
 
     if(deactivate_ImportanceSampling){
         cout << "Without importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << numerical_energySolver << endl;
@@ -218,9 +216,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         int counter = 0;
         int counter2 = 0;
         double acceptCounter = 0;
-
-        vec positions = zeros(nParticles*nDimensions);
-
 
         // initial trial positions
         for(int i = 0; i < nParticles; i++){
