@@ -34,14 +34,14 @@ private:
     void QuantumForce(const mat &r, mat &F);
     double psi1s(double &radius);
     double psi2s(double &radius);
-    double psi2px(double &positions, double &radius);
-    double psi2py(double &positions, double &radius);
-    double psi2pz(double &positions, double &radius);
+    double psi2px(double &x, double &radius);
+    double psi2py(double &y, double &radius);
+    double psi2pz(double &z, double &radius);
 
     void fill_a_matrix();
     double JastrowFactor();
     double SlaterPsi(const mat &positions, int i, int j);
-    void SlaterDeterminant(const mat &r, mat &D_up_inv, mat &D_down_inv);
+    void SlaterDeterminant(const mat &positions, mat &D_up_inv, mat &D_down_inv);
 
     string AtomType;
 

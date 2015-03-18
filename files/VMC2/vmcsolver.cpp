@@ -609,33 +609,33 @@ double VMCSolver::psi2s(double &radius){
 }
 
 // 2px hydrogenic orbital
-double VMCSolver::psi2px(double &positions, double &radius){
+double VMCSolver::psi2px(double &x, double &radius){
     double psi2px;
-    psi2px = alpha*positions*exp(-alpha*radius/2.0);
+    psi2px = alpha*x*exp(-alpha*radius/2.0);
     return psi2px;
 }
 
 // 2py hydrogenic orbital
-double VMCSolver::psi2py(double &positions, double &radius){
+double VMCSolver::psi2py(double &y, double &radius){
     double psi2py;
-    psi2py = alpha*positions*exp(-alpha*radius/2.0);
+    psi2py = alpha*y*exp(-alpha*radius/2.0);
     return psi2py;
 }
 
 // 2pz hydrogenic orbital
-double VMCSolver::psi2pz(double &positions, double &radius){
+double VMCSolver::psi2pz(double &z, double &radius){
     double psi2pz;
-    psi2pz = alpha*positions*exp(-alpha*radius/2.0);
+    psi2pz = alpha*z*exp(-alpha*radius/2.0);
     return psi2pz;
 }
 
 
-double VMCSolver::SlaterPsi(const mat &r, int i, int j){
+double VMCSolver::SlaterPsi(const mat &positions, int i, int j){
 
-    double positions;
     double radius;
+    double x, y, z;
 
-    r_func(r);
+    r_func(positions);
     radius = r_radius(i);
 
     if(j == 0){
@@ -645,16 +645,16 @@ double VMCSolver::SlaterPsi(const mat &r, int i, int j){
         return psi2s(radius);
     }
     else if(j == 2){
-        positions = r(i, 0);
-        return psi2px(positions, radius);
+        x = positions(i, 0);
+        return psi2px(x, radius);
     }
     else if(j == 3){
-        positions = r(i, 1);
-        return psi2py(positions, radius);
+        y = positions(i, 1);
+        return psi2py(y, radius);
     }
     else if(j == 4){
-        positions = r(i, 2);
-        return psi2pz(positions, radius);
+        z = positions(i, 2);
+        return psi2pz(z, radius);
     }
     else{
         return 0;
@@ -663,15 +663,15 @@ double VMCSolver::SlaterPsi(const mat &r, int i, int j){
 
 
 // compute the Slater determinant
-void VMCSolver::SlaterDeterminant(const mat &r, mat &D_up_inv, mat &D_down_inv){
+void VMCSolver::SlaterDeterminant(const mat &positions, mat &D_up_inv, mat &D_down_inv){
     mat D_up = zeros(nParticles/2, nParticles/2);
     mat D_down = zeros(nParticles/2, nParticles/2);
 
     // compute spinn up part and spin down part
     for(int j=0; j<nParticles/2; j++){
         for(int i=0; i<nParticles/2; i++){
-            D_up(i,j) = SlaterPsi(r, i, j);
-            D_down(i,j) = SlaterPsi(r, i+nParticles/2, j);
+            D_up(i,j) = SlaterPsi(positions, i, j);
+            D_down(i,j) = SlaterPsi(positions, i+nParticles/2, j);
         }
     }
     D_up_inv = inv(D_up);
@@ -696,7 +696,8 @@ void VMCSolver::SlaterDeterminant(const mat &r, mat &D_up_inv, mat &D_down_inv){
 
 
 // compute the R_sd ratio
-void VMCSolver::R_sd(const mat &r_new, const mat &r_cur){
+double VMCSolver::R_sd(const mat &r_new, const mat &r_cur){
+    double R_sd_value;
     mat D_up_inv = zeros(nParticles/2, nParticles/2);
     mat D_down_inv = zeros(nParticles/2, nParticles/2);
 
@@ -711,6 +712,8 @@ void VMCSolver::R_sd(const mat &r_new, const mat &r_cur){
             R_sd_down += SlaterPsi(r_new, i+nParticles/2, j)*D_down_inv(j, i);
         }
     }
+    // ??? What to return? or void?
+    return R_sd_value;
     // ??? What to to next with this? Should I split up in two functions or take in R_sd as argument
 }
 
@@ -718,19 +721,19 @@ void VMCSolver::R_sd(const mat &r_new, const mat &r_cur){
 
 
 // compute slater first derivative
-void VMCSolver::Slater_first_derivative(const mat &r){
+void VMCSolver::Slater_first_derivative(const mat &positions){
     mat D_up_inv = zeros(nParticles/2, nParticles/2);
     mat D_down_inv = zeros(nParticles/2, nParticles/2);
 
-    SlaterDeterminant(r, D_up_inv, D_down_inv);
+    SlaterDeterminant(positions, D_up_inv, D_down_inv);
 
     double derivative_up = 0.0;
     double derivative_down = 0.0;
 
     for(int i=0; i<nParticles/2; i++){
         for(int j=0; j<nParticles/2; j++){
-            derivative_up += Psi_first_derivative(r, i, j)*D_up_inv(j, i);
-            derivative_down += Psi_first_derivative(r, i+nParticles/2, j)*D_down_inv(j, i);
+            derivative_up += Psi_first_derivative(positions, i, j)*D_up_inv(j, i);
+            derivative_down += Psi_first_derivative(positions, i+nParticles/2, j)*D_down_inv(j, i);
         }
     }
 }
@@ -739,19 +742,19 @@ void VMCSolver::Slater_first_derivative(const mat &r){
 
 
 // compute slater second derivative
-void VMCSolver::Slater_second_derivative(const mat &r){
+void VMCSolver::Slater_second_derivative(const mat &positions){
     mat D_up_inv = zeros(nParticles/2, nParticles/2);
     mat D_down_inv = zeros(nParticles/2, nParticles/2);
 
-    SlaterDeterminant(r, D_up_inv, D_down_inv);
+    SlaterDeterminant(positions, D_up_inv, D_down_inv);
 
     double derivative_up = 0.0;
     double derivative_down = 0.0;
 
     for(int i=0; i<nParticles/2; i++){
         for(int j=0; j<nParticles/2; j++){
-            derivative_up += Psi_second_derivative(r, i, j)*D_up_inv(j, i);
-            derivative_down += Psi_second_derivative(r, i+nParticles/2, j)*D_down_inv(j, i);
+            derivative_up += Psi_second_derivative(positions, i, j)*D_up_inv(j, i);
+            derivative_down += Psi_second_derivative(positions, i+nParticles/2, j)*D_down_inv(j, i);
         }
     }
 }
@@ -760,70 +763,71 @@ void VMCSolver::Slater_second_derivative(const mat &r){
 
 
 
+// Gradient of orbitals used in quantum force
+double VMCSolver::Psi_first_derivative(const mat &positions, int i, int j){
+    double r;
+    double x, y, z;
 
-// ??? SET IN EXPRESSIONS!!!
-double VMCSolver::Psi_first_derivative(const mat &r, int i, int j){
+    r_func(positions);
 
-    double positions;
-    double radius;
-
-    r_func(r);
-    radius = r_radius(i);
+    r = r_radius(i);
+    x = rNew(i, 0);
+    y = rNew(i, 1);
+    z = rNew(i, 2);
 
     if(j == 0){
-        return psi1s(radius);
+        return -alpha*(x + y + z)*exp(-alpha*r)/r;
     }
     else if(j == 1){
-        return psi2s(radius);
+        return  0.25*alpha*(0.5*alpha*r - 2.0)*(x + y + z)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 2){
-        positions = r(i, 0);
-        return psi2px(positions, radius);
+        return -1.0*alpha*(alpha*(0.5*pow(x, 2) + 0.5*x*y + 0.5*x*z) - 1.0*r)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 3){
-        positions = r(i, 1);
-        return psi2py(positions, radius);
+        return -1.0*alpha*(alpha*(0.5*x*y + 0.5*pow(y, 2) + 0.5*y*z) - 1.0*r)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 4){
-        positions = r(i, 2);
-        return psi2pz(positions, radius);
+        return -1.0*alpha*(alpha*(0.5*x*z + 0.5*y*z + 0.5*pow(z, 2)) - 1.0*r)*exp(-0.5*alpha*r)/r;
     }
     else{
         return 0;
     }
 }
 
-// ??? SET IN EXPRESSIONS!!!
-double VMCSolver::Psi_second_derivative(const mat &r, int i, int j){
 
-    double positions;
-    double radius;
+// Laplacian of orbitals used in kinetic energy
+double VMCSolver::Psi_second_derivative(const mat &positions, int i, int j){
+    double r;
+    double x, y, z;
 
-    r_func(r);
-    radius = r_radius(i);
+    r_func(positions);
+
+    r = r_radius(i);
+    x = rNew(i, 0);
+    y = rNew(i, 1);
+    z = rNew(i, 2);
 
     if(j == 0){
-        return psi1s(radius);
+        return alpha*(alpha*r - 2)*exp(-alpha*r)/r;
     }
     else if(j == 1){
-        return psi2s(radius);
+        return -0.015625*alpha*(0.125*pow(alpha, 2)*pow(x, 2) + 0.125*pow(alpha, 2)*pow(y, 2) + 0.125*pow(alpha, 2)*pow(z, 2) - 1.25*alpha*r + 2.0)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 2){
-        positions = r(i, 0);
-        return psi2px(positions, radius);
+        return 0.0625*pow(alpha, 2)*x*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 3){
-        positions = r(i, 1);
-        return psi2py(positions, radius);
+        return 0.0625*pow(alpha, 2)*y*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 4){
-        positions = r(i, 2);
-        return psi2pz(positions, radius);
+        return 0.0625*pow(alpha, 2)*z*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
     }
     else{
         return 0;
     }
 }
+
 
 
 
