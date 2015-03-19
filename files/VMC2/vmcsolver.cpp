@@ -46,6 +46,9 @@ VMCSolver::VMCSolver():
     D_down_new = zeros(nParticles/2, nParticles/2);
     D_up_old = zeros(nParticles/2, nParticles/2);
     D_up_new = zeros(nParticles/2, nParticles/2);
+
+    SlaterGradientsOld = zeros(nParticles, nDimensions);
+    SlaterGradientsNew = zeros(nParticles, nDimensions);
 }
 
 // function to run MC simualtions form main.cpp
@@ -252,9 +255,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         for(int cycle = 0; cycle < nCycles; cycle++) {
 
             // Store the current value of the wave function
-            waveFunctionOld = waveFunction(rOld);
+            D_down_old = D_down_new;//???????????????
+            D_up_old = D_up_new;
+
             QuantumForce(rOld, QForceOld);
-            QForceOld = QForceOld*h/waveFunctionOld;
 
             // New position to test
             for(int i = 0; i < nParticles; i++) {
@@ -273,7 +277,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
                 // Recalculate the value of the wave function and the quantum force
                 SlaterDeterminant(rNew);
-                QuantumForce(rNew,QForceNew); QForceNew*h/waveFunctionNew;
+                QuantumForce(rNew,QForceNew);
 
                 //  we compute the log of the ratio of the greens functions to be used in the
                 //  Metropolis-Hastings algorithm
@@ -355,30 +359,10 @@ double VMCSolver::localEnergy(const mat &r)
     // numerical computation of local energy
     if (numerical_energySolver){
 
-        mat rPlus = zeros<mat>(nParticles, nDimensions);
-        mat rMinus = zeros<mat>(nParticles, nDimensions);
-
-        rPlus = rMinus = r;
-
-        double waveFunctionMinus = 0;
-        double waveFunctionPlus = 0;
-
-        double waveFunctionCurrent = waveFunction(r);
-
         // Kinetic energy
-        double kineticEnergy = 0;
-        for(int i = 0; i < nParticles; i++) {
-            for(int j = 0; j < nDimensions; j++) {
-                rPlus(i,j) += h;
-                rMinus(i,j) -= h;
-                waveFunctionMinus = waveFunction(rMinus);
-                waveFunctionPlus = waveFunction(rPlus);
-                kineticEnergy -= (waveFunctionMinus + waveFunctionPlus - 2 * waveFunctionCurrent);
-                rPlus(i,j) = r(i,j);
-                rMinus(i,j) = r(i,j);
-            }
-        }
-        kineticEnergy = 0.5 * h2 * kineticEnergy / waveFunctionCurrent;
+        double kineticEnergy = Slater_second_derivative();
+
+        kineticEnergy = -0.5*kineticEnergy;
 
         // Potential energy
         double potentialEnergy = 0;
@@ -452,56 +436,7 @@ double VMCSolver::localEnergy(const mat &r)
 // function that compute wavefunctions given with to compute bu user
 double VMCSolver::waveFunction(const mat &r)
 {
-    if (AtomType == "helium"){
-        if (deactivate_JastrowFactor){
-            double argument = 0;
-            for(int i = 0; i < nParticles; i++) {
-                double rSingleParticle = 0;
-                for(int j = 0; j < nDimensions; j++) {
-                    rSingleParticle += r(i,j) * r(i,j);
-                }
-                argument += sqrt(rSingleParticle);
-            }
-            return exp(-argument * alpha);
-        }
 
-        if (deactivate_JastrowFactor == false){
-            r_func(r);
-            int div = nParticles*nParticles - nParticles;
-            double r12 = sum(sum(r_distance))/div;
-
-            double argument = 0;
-            for(int i = 0; i < nParticles; i++) {
-                double rSingleParticle = 0;
-                for(int j = 0; j < nDimensions; j++) {
-                    rSingleParticle += r(i,j) * r(i,j);
-                }
-                argument += sqrt(rSingleParticle);
-            }
-            return exp(-argument * alpha)*exp(r12/(2*(1.0 + beta*r12)));
-        }
-    }
-
-    else if (AtomType == "beryllium"){
-        if (deactivate_JastrowFactor){
-            r_func(r);
-
-            double hydrogenic = SlaterDeterminant();
-            return hydrogenic;
-        }
-
-        if (deactivate_JastrowFactor == false){
-            r_func(r);
-
-            double factor = JastrowFactor();
-            double hydrogenic = SlaterDeterminant();
-            return hydrogenic*factor;
-        }
-
-        else{
-            exit(0);
-        }
-    }
 }
 
 
@@ -545,23 +480,9 @@ void VMCSolver::save_positions_func(const mat &r, fstream &outfile){
 // compute the quantum force used in importance sampling
 void VMCSolver::QuantumForce(const mat &r, mat &QForce)
 {
-    mat rPlus = zeros<mat>(nParticles, nDimensions);
-    mat rMinus = zeros<mat>(nParticles, nDimensions);
-
-    rPlus = rMinus = r;
-
-    double waveFunctionMinus = 0;
-    double waveFunctionPlus = 0;
-
     for(int i = 0; i < nParticles; i++) {
         for(int j = 0; j < nDimensions; j++) {
-            rPlus(i,j) += h;
-            rMinus(i,j) -= h;
-            waveFunctionMinus = waveFunction(rMinus);
-            waveFunctionPlus = waveFunction(rPlus);
-            QForce(i,j) =  (waveFunctionPlus-waveFunctionMinus);
-            rPlus(i,j) = r(i,j);
-            rMinus(i,j) = r(i,j);
+            QForce(i,j) =  2*SlaterGradientsNew(i,j) ;
         }
     }
 }
@@ -718,46 +639,38 @@ double VMCSolver::compute_R_sd(int k){
 
 
 // compute slater first derivative
-double VMCSolver::Slater_first_derivative(int k){
-    double derivative_up = 0.0;
-    double derivative_down = 0.0;
+void VMCSolver::Slater_first_derivative(int i){
 
-    if(k < nParticles/2){
-        for(int i=0; i<nParticles/2; i++){
+    if(i < nParticles/2){
+        for(int k=0; k<nDimensions; k++){
+            double derivative_up = 0.0;
             for(int j=0; j<nParticles/2; j++){
-                derivative_up += (1.0/R_sd)*Psi_first_derivative(rNew, i, j)*D_up_old(j, i);
+                derivative_up += (1.0/R_sd)*Psi_first_derivative(rNew, i, j, k)*D_up_old(j, i);
             }
+            SlaterGradientsNew(i,k) = derivative_up;
         }
     }
     else{
-        for(int i=0; i<nParticles/2; i++){
+        for(int k=0; k<nDimensions; k++){
+            double derivative_down = 0.0;
             for(int j=0; j<nParticles/2; j++){
-                derivative_down += (1.0/R_sd)*Psi_first_derivative(rNew, i+nParticles/2, j)*D_down_old(j, i);
+                derivative_down += (1.0/R_sd)*Psi_first_derivative(rNew, i+nParticles/2, j, k)*D_down_old(j, i);
             }
+            SlaterGradientsNew(i,k) = derivative_down;
         }
     }
-    double derivative_sum = derivative_up + derivative_down;
-    return derivative_sum;
 }
 
 
 // compute slater second derivative
-double VMCSolver::Slater_second_derivative(int k){
+double VMCSolver::Slater_second_derivative(){
     double derivative_up = 0.0;
     double derivative_down = 0.0;
 
-    if(k < nParticles/2){
-        for(int i=0; i<nParticles/2; i++){
-            for(int j=0; j<nParticles/2; j++){
-                derivative_up += Psi_second_derivative(rNew, i, j)*D_up_old(j, i);
-            }
-        }
-    }
-    else{
-        for(int i=0; i<nParticles/2; i++){
-            for(int j=0; j<nParticles/2; j++){
-                derivative_down += Psi_second_derivative(rNew, i+nParticles/2, j)*D_down_old(j, i);
-            }
+    for(int i=0; i<nParticles/2; i++){
+        for(int j=0; j<nParticles/2; j++){
+            derivative_up += Psi_second_derivative(rNew, i, j)*D_up_old(j, i);
+            derivative_down += Psi_second_derivative(rNew, i+nParticles/2, j)*D_down_old(j, i);
         }
     }
     double derivative_sum = derivative_up + derivative_down;
@@ -766,7 +679,8 @@ double VMCSolver::Slater_second_derivative(int k){
 
 
 // Gradient of orbitals used in quantum force
-double VMCSolver::Psi_first_derivative(const mat &positions, int i, int j){
+double VMCSolver::Psi_first_derivative(const mat &positions, int i, int j, int k){
+    // add new expression that takes in k for selceting x, y z
     double r;
     double x, y, z;
 
@@ -855,7 +769,7 @@ double VMCSolver::Psi_second_derivative(const mat &positions, int i, int j){
 
 
 
-
+/*
 
 // Not at all completed
 // update Slater determinant effectively
@@ -883,7 +797,7 @@ void VMCSolver::SlaterUpdating(const mat &r, mat &D_up_inv, mat &D_down_inv){
 
 }
 
-
+*/
 
 
 

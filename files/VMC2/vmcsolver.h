@@ -43,9 +43,9 @@ private:
     double SlaterPsi(const mat &positions, int i, int j);
     void SlaterDeterminant(const mat &positions);
     double compute_R_sd(int k);
-    double Slater_first_derivative(int k);
-    double Slater_second_derivative(int k);
-    double Psi_first_derivative(const mat &positions, int i, int j);
+    void Slater_first_derivative(int k);
+    double Slater_second_derivative();
+    double Psi_first_derivative(const mat &positions, int i, int j, int k);
     double Psi_second_derivative(const mat &positions, int i, int j);
 
     string AtomType;
@@ -96,6 +96,8 @@ private:
     mat D_down_new;
     mat D_up_old;
     mat D_up_new;
+    mat SlaterGradientsOld;
+    mat SlaterGradientsNew;
 
 };
 
