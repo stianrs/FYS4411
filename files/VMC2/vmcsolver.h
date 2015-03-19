@@ -41,7 +41,12 @@ private:
     void fill_a_matrix();
     double JastrowFactor();
     double SlaterPsi(const mat &positions, int i, int j);
-    void SlaterDeterminant(const mat &positions, mat &D_up_inv, mat &D_down_inv);
+    void SlaterDeterminant(const mat &positions);
+    double compute_R_sd(int k);
+    double Slater_first_derivative(int k);
+    double Slater_second_derivative(int k);
+    double Psi_first_derivative(const mat &positions, int i, int j);
+    double Psi_second_derivative(const mat &positions, int i, int j);
 
     string AtomType;
 
@@ -84,6 +89,13 @@ private:
     double variance;
     double averange_r_ij;
     double cpu_time;
+    double R_sd;
+    double R_c;
+    double R;
+    mat D_down_old;
+    mat D_down_new;
+    mat D_up_old;
+    mat D_up_new;
 
 };
 

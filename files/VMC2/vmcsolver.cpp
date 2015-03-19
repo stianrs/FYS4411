@@ -32,9 +32,20 @@ VMCSolver::VMCSolver():
     h2(1000000), // 1/h^2 used in numerical integration
     idum(time(0)) // random number generator, seed=time(0) for random seed
 
-{
+{    
+    rOld = zeros(nParticles, nDimensions);
+    rNew = zeros(nParticles, nDimensions);
+
     r_distance = zeros(nParticles, nParticles); // distance between electrons
     r_radius = zeros(nParticles); // distance between nucleus and electrons
+
+    QForceOld = zeros(nParticles, nDimensions);
+    QForceNew = zeros(nParticles, nDimensions);
+
+    D_down_old = zeros(nParticles/2, nParticles/2);
+    D_down_new = zeros(nParticles/2, nParticles/2);
+    D_up_old = zeros(nParticles/2, nParticles/2);
+    D_up_new = zeros(nParticles/2, nParticles/2);
 }
 
 // function to run MC simualtions form main.cpp
@@ -74,15 +85,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
         int n = nCycles*nParticles;
 
-        rOld = zeros<mat>(nParticles, nDimensions);
-        rNew = zeros<mat>(nParticles, nDimensions);
-
         energy_single = zeros<vec>(n);;
         energySquared_single = zeros<vec>(n);
-
-
-        double waveFunctionOld = 0;
-        double waveFunctionNew = 0;
 
         double deltaE;
         double energySum = 0;
@@ -105,6 +109,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         }
         rNew = rOld;
 
+        SlaterDeterminant(rNew);
+
+        D_down_old = D_down_new;
+        D_up_old = D_up_new;
 
         // store initial position
         if (save_positions){
@@ -124,9 +132,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         // loop over Monte Carlo cycles
         for(int cycle = 0; cycle < nCycles; cycle++) {
 
-            // Store the current value of the wave function
-            waveFunctionOld = waveFunction(rOld);
-
             // New position to test
             for(int i = 0; i < nParticles; i++) {
                 for(int j = 0; j < nDimensions; j++) {
@@ -134,13 +139,19 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
                 }
 
                 // Recalculate the value of the wave function
-                waveFunctionNew = waveFunction(rNew);
+                SlaterDeterminant(rNew);
+
+                compute_R_sd(i);
+                R_c = 1; // this has to be calculated
+                R = R_sd*R_c;
 
                 // Check for step acceptance (if yes, update position, if no, reset position)
-                if(ran2(&idum) <= (waveFunctionNew*waveFunctionNew) / (waveFunctionOld*waveFunctionOld)) {
+                if(ran2(&idum) <= R*R) {
                     for(int j = 0; j < nDimensions; j++) {
                         rOld(i,j) = rNew(i,j);
-                        waveFunctionOld = waveFunctionNew;
+
+                        D_down_old = D_down_new;
+                        D_up_old = D_up_new;
                     }
                     acceptCounter += 1;
                     counter2 += 1;
@@ -195,16 +206,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
         int n = nCycles*nParticles;
 
-        rOld = zeros<mat>(nParticles, nDimensions);
-        rNew = zeros<mat>(nParticles, nDimensions);
-        QForceOld = zeros<mat>(nParticles, nDimensions);
-        QForceNew = zeros<mat>(nParticles, nDimensions);
-
         energy_single = zeros<vec>(n);;
         energySquared_single = zeros<vec>(n);
-
-        double waveFunctionOld = 0;
-        double waveFunctionNew = 0;
 
         double deltaE;
         double energySum = 0;
@@ -224,6 +227,11 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
             }
         }
         rNew = rOld;
+
+        SlaterDeterminant(rNew);
+
+        D_down_old = D_down_new;
+        D_up_old = D_up_new;
 
         // store initial position
         if (save_positions){
@@ -264,7 +272,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
                 }
 
                 // Recalculate the value of the wave function and the quantum force
-                waveFunctionNew = waveFunction(rNew);
+                SlaterDeterminant(rNew);
                 QuantumForce(rNew,QForceNew); QForceNew*h/waveFunctionNew;
 
                 //  we compute the log of the ratio of the greens functions to be used in the
@@ -276,13 +284,18 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
                 }
                 GreensFunction = exp(GreensFunction);
 
+                compute_R_sd(i);
+                R_c = 1; // this has to be calculated
+                R = R_sd*R_c;
 
                 // The Metropolis test is performed by moving one particle at the time
-                if(ran2(&idum) <= GreensFunction*(waveFunctionNew*waveFunctionNew) / (waveFunctionOld*waveFunctionOld)) {
+                if(ran2(&idum) <= GreensFunction*R*R) {
                     for(int j = 0; j < nDimensions; j++) {
                         rOld(i,j) = rNew(i,j);
                         QForceOld(i,j) = QForceNew(i,j);
-                        waveFunctionOld = waveFunctionNew;
+
+                        D_down_old = D_down_new;
+                        D_up_old = D_up_new;
                     }
                     acceptCounter += 1;
                     counter2 += 1;
@@ -663,7 +676,7 @@ double VMCSolver::SlaterPsi(const mat &positions, int i, int j){
 
 
 // compute the Slater determinant
-void VMCSolver::SlaterDeterminant(const mat &positions, mat &D_up_inv, mat &D_down_inv){
+void VMCSolver::SlaterDeterminant(const mat &positions){
     mat D_up = zeros(nParticles/2, nParticles/2);
     mat D_down = zeros(nParticles/2, nParticles/2);
 
@@ -674,93 +687,82 @@ void VMCSolver::SlaterDeterminant(const mat &positions, mat &D_up_inv, mat &D_do
             D_down(i,j) = SlaterPsi(positions, i+nParticles/2, j);
         }
     }
-    D_up_inv = inv(D_up);
-    D_down_inv = inv(D_down);
+    D_up_new = inv(D_up);
+    D_down_new = inv(D_down);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Code under this are not completed
-
 
 
 
 // compute the R_sd ratio
-double VMCSolver::R_sd(const mat &r_new, const mat &r_cur){
-    double R_sd_value;
-    mat D_up_inv = zeros(nParticles/2, nParticles/2);
-    mat D_down_inv = zeros(nParticles/2, nParticles/2);
+double VMCSolver::compute_R_sd(int k){
 
-    SlaterDeterminant(r_cur, D_up_inv, D_down_inv);
+    R_sd = 0.0;
 
-    double R_sd_up = 0.0;
-    double R_sd_down = 0.0;
-
-    for(int i=0; i<nParticles/2; i++){
-        for(int j=0; j<nParticles/2; j++){
-            R_sd_up += SlaterPsi(r_new, i, j)*D_up_inv(j, i);
-            R_sd_down += SlaterPsi(r_new, i+nParticles/2, j)*D_down_inv(j, i);
+    if (k < nParticles/2){
+        for(int i=0; i<nParticles/2; i++){
+            for(int j=0; j<nParticles/2; j++){
+                R_sd += SlaterPsi(rNew, i, j)*D_up_inv(j, i);
+            }
         }
     }
-    // ??? What to return? or void?
-    return R_sd_value;
-    // ??? What to to next with this? Should I split up in two functions or take in R_sd as argument
+    else{
+        for(int i=0; i<nParticles/2; i++){
+            for(int j=0; j<nParticles/2; j++){
+                R_sd += SlaterPsi(rNew, i+nParticles/2, j)*D_down_inv(j, i);
+            }
+        }
+    }
+    return R_sd;
 }
-
 
 
 
 // compute slater first derivative
-void VMCSolver::Slater_first_derivative(const mat &positions){
-    mat D_up_inv = zeros(nParticles/2, nParticles/2);
-    mat D_down_inv = zeros(nParticles/2, nParticles/2);
-
-    SlaterDeterminant(positions, D_up_inv, D_down_inv);
-
+double VMCSolver::Slater_first_derivative(int k){
     double derivative_up = 0.0;
     double derivative_down = 0.0;
 
-    for(int i=0; i<nParticles/2; i++){
-        for(int j=0; j<nParticles/2; j++){
-            derivative_up += Psi_first_derivative(positions, i, j)*D_up_inv(j, i);
-            derivative_down += Psi_first_derivative(positions, i+nParticles/2, j)*D_down_inv(j, i);
+    if(k < nParticles/2){
+        for(int i=0; i<nParticles/2; i++){
+            for(int j=0; j<nParticles/2; j++){
+                derivative_up += (1.0/R_sd)*Psi_first_derivative(rNew, i, j)*D_up_old(j, i);
+            }
         }
     }
+    else{
+        for(int i=0; i<nParticles/2; i++){
+            for(int j=0; j<nParticles/2; j++){
+                derivative_down += (1.0/R_sd)*Psi_first_derivative(rNew, i+nParticles/2, j)*D_down_old(j, i);
+            }
+        }
+    }
+    double derivative_sum = derivative_up + derivative_down;
+    return derivative_sum;
 }
-
-
 
 
 // compute slater second derivative
-void VMCSolver::Slater_second_derivative(const mat &positions){
-    mat D_up_inv = zeros(nParticles/2, nParticles/2);
-    mat D_down_inv = zeros(nParticles/2, nParticles/2);
-
-    SlaterDeterminant(positions, D_up_inv, D_down_inv);
-
+double VMCSolver::Slater_second_derivative(int k){
     double derivative_up = 0.0;
     double derivative_down = 0.0;
 
-    for(int i=0; i<nParticles/2; i++){
-        for(int j=0; j<nParticles/2; j++){
-            derivative_up += Psi_second_derivative(positions, i, j)*D_up_inv(j, i);
-            derivative_down += Psi_second_derivative(positions, i+nParticles/2, j)*D_down_inv(j, i);
+    if(k < nParticles/2){
+        for(int i=0; i<nParticles/2; i++){
+            for(int j=0; j<nParticles/2; j++){
+                derivative_up += Psi_second_derivative(rNew, i, j)*D_up_old(j, i);
+            }
         }
     }
+    else{
+        for(int i=0; i<nParticles/2; i++){
+            for(int j=0; j<nParticles/2; j++){
+                derivative_down += Psi_second_derivative(rNew, i+nParticles/2, j)*D_down_old(j, i);
+            }
+        }
+    }
+    double derivative_sum = derivative_up + derivative_down;
+    return derivative_sum;
 }
-
-
-
 
 
 // Gradient of orbitals used in quantum force
@@ -827,6 +829,29 @@ double VMCSolver::Psi_second_derivative(const mat &positions, int i, int j){
         return 0;
     }
 }
+
+
+
+
+
+
+
+
+
+// Code under this are not completed
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
