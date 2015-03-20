@@ -43,10 +43,11 @@ private:
     double SlaterPsi(const mat &positions, int i, int j);
     void SlaterDeterminant(const mat &positions);
     double compute_R_sd(int k);
-    void Slater_first_derivative(int k);
+    void Slater_first_derivative(int i);
     double Slater_second_derivative();
     double Psi_first_derivative(const mat &positions, int i, int j, int k);
     double Psi_second_derivative(const mat &positions, int i, int j);
+
 
     string AtomType;
 

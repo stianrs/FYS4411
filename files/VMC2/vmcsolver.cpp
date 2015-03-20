@@ -21,7 +21,7 @@ VMCSolver::VMCSolver():
     numerical_energySolver(true), // set true to solve integral numerical
 
     deactivate_JastrowFactor(true), // set false to activate importance sampling
-    deactivate_ImportanceSampling(true), // set false to activate importance sampling
+    deactivate_ImportanceSampling(false), // set false to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
 
     timestep(0.002), // timestep used in importance sampling
@@ -33,22 +33,13 @@ VMCSolver::VMCSolver():
     idum(time(0)) // random number generator, seed=time(0) for random seed
 
 {    
-    rOld = zeros(nParticles, nDimensions);
-    rNew = zeros(nParticles, nDimensions);
-
     r_distance = zeros(nParticles, nParticles); // distance between electrons
     r_radius = zeros(nParticles); // distance between nucleus and electrons
-
-    QForceOld = zeros(nParticles, nDimensions);
-    QForceNew = zeros(nParticles, nDimensions);
 
     D_down_old = zeros(nParticles/2, nParticles/2);
     D_down_new = zeros(nParticles/2, nParticles/2);
     D_up_old = zeros(nParticles/2, nParticles/2);
     D_up_new = zeros(nParticles/2, nParticles/2);
-
-    SlaterGradientsOld = zeros(nParticles, nDimensions);
-    SlaterGradientsNew = zeros(nParticles, nDimensions);
 }
 
 // function to run MC simualtions form main.cpp
@@ -65,12 +56,14 @@ void VMCSolver::SetParametersAtomType(string AtomType){
         nParticles = 2;
         alpha = 1.85;
         beta = 0.35;
+        stepLength = 1.4;
     }
     else if(AtomType == "beryllium"){
         charge = 4;
         nParticles = 4;
         alpha = 3.9;
         beta = 0.1;
+        stepLength = 1.4;
     }
 }
 
@@ -88,6 +81,9 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
         int n = nCycles*nParticles;
 
+        rOld = zeros<mat>(nParticles, nDimensions);
+        rNew = zeros<mat>(nParticles, nDimensions);
+
         energy_single = zeros<vec>(n);;
         energySquared_single = zeros<vec>(n);
 
@@ -102,7 +98,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         int counter2 = 0;
         double acceptCounter = 0;
 
-        stepLength = InvestigateOptimalStep();
+        //stepLength = InvestigateOptimalStep();
 
         // initial trial positions
         for(int i = 0; i < nParticles; i++) {
@@ -155,6 +151,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
                         D_down_old = D_down_new;
                         D_up_old = D_up_new;
+
                     }
                     acceptCounter += 1;
                     counter2 += 1;
@@ -208,6 +205,14 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         cout << "With importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << numerical_energySolver << endl;
 
         int n = nCycles*nParticles;
+
+        rOld = zeros<mat>(nParticles, nDimensions);
+        rNew = zeros<mat>(nParticles, nDimensions);
+        QForceOld = zeros<mat>(nParticles, nDimensions);
+        QForceNew = zeros<mat>(nParticles, nDimensions);
+
+        SlaterGradientsOld = zeros<mat>(nParticles, nDimensions);
+        SlaterGradientsNew = zeros<mat>(nParticles, nDimensions);
 
         energy_single = zeros<vec>(n);;
         energySquared_single = zeros<vec>(n);
@@ -476,20 +481,6 @@ void VMCSolver::save_positions_func(const mat &r, fstream &outfile){
 }
 
 
-
-// compute the quantum force used in importance sampling
-void VMCSolver::QuantumForce(const mat &r, mat &QForce)
-{
-    for(int i = 0; i < nParticles; i++) {
-        for(int j = 0; j < nDimensions; j++) {
-            QForce(i,j) =  2*SlaterGradientsNew(i,j) ;
-        }
-    }
-}
-
-
-
-
 // set up spinns and compute the a-matrix
 void VMCSolver::fill_a_matrix(){
     vec spin = zeros(nParticles);
@@ -622,14 +613,14 @@ double VMCSolver::compute_R_sd(int k){
     if (k < nParticles/2){
         for(int i=0; i<nParticles/2; i++){
             for(int j=0; j<nParticles/2; j++){
-                R_sd += SlaterPsi(rNew, i, j)*D_up_inv(j, i);
+                R_sd += SlaterPsi(rNew, i, j)*D_up_old(j, i);
             }
         }
     }
     else{
         for(int i=0; i<nParticles/2; i++){
             for(int j=0; j<nParticles/2; j++){
-                R_sd += SlaterPsi(rNew, i+nParticles/2, j)*D_down_inv(j, i);
+                R_sd += SlaterPsi(rNew, i+nParticles/2, j)*D_down_old(j, i);
             }
         }
     }
@@ -638,14 +629,29 @@ double VMCSolver::compute_R_sd(int k){
 
 
 
+// compute the quantum force used in importance sampling
+void VMCSolver::QuantumForce(const mat &r, mat &F)
+{
+
+    for(int i = 0; i < nParticles; i++){
+        Slater_first_derivative(i);
+        for(int j = 0; j < nDimensions; j++) {
+            F(i,j) =  2.0*SlaterGradientsNew(i,j);
+        }
+    }
+}
+
+
+
 // compute slater first derivative
 void VMCSolver::Slater_first_derivative(int i){
-
+    cout << SlaterGradientsNew << endl;
     if(i < nParticles/2){
         for(int k=0; k<nDimensions; k++){
             double derivative_up = 0.0;
             for(int j=0; j<nParticles/2; j++){
                 derivative_up += (1.0/R_sd)*Psi_first_derivative(rNew, i, j, k)*D_up_old(j, i);
+                 cout << R_sd << endl; //??????????????? we get R_sd=0, so we get inf in derivative up, need value before calling quantum force
             }
             SlaterGradientsNew(i,k) = derivative_up;
         }
@@ -681,30 +687,62 @@ double VMCSolver::Slater_second_derivative(){
 // Gradient of orbitals used in quantum force
 double VMCSolver::Psi_first_derivative(const mat &positions, int i, int j, int k){
     // add new expression that takes in k for selceting x, y z
-    double r;
+    double r, coor;
     double x, y, z;
 
     r_func(positions);
-
     r = r_radius(i);
+
+    coor = rNew(i, k);
+
     x = rNew(i, 0);
     y = rNew(i, 1);
     z = rNew(i, 2);
 
     if(j == 0){
-        return -alpha*(x + y + z)*exp(-alpha*r)/r;
+        return -alpha*coor*exp(-alpha*r)/r;
     }
     else if(j == 1){
-        return  0.25*alpha*(0.5*alpha*r - 2.0)*(x + y + z)*exp(-0.5*alpha*r)/r;
+        return 0.25*alpha*coor*(alpha*r - 4.0)*exp(-0.5*alpha*r)/r;
     }
+
+
     else if(j == 2){
-        return -1.0*alpha*(alpha*(0.5*pow(x, 2) + 0.5*x*y + 0.5*x*z) - 1.0*r)*exp(-0.5*alpha*r)/r;
+        if(k==0){
+            return -alpha*(0.5*alpha*pow(x, 2) - r)*exp(-0.5*alpha*r)/r;
+        }
+        else if(k==1){
+            return -0.5*pow(alpha, 2)*x*y*exp(-0.5*alpha*r)/r;
+        }
+        else{
+            return -0.5*pow(alpha, 2)*x*z*exp(-0.5*alpha*r)/r;
+        }
     }
+
+
     else if(j == 3){
-        return -1.0*alpha*(alpha*(0.5*x*y + 0.5*pow(y, 2) + 0.5*y*z) - 1.0*r)*exp(-0.5*alpha*r)/r;
+        if(k==0){
+            return -0.5*pow(alpha, 2)*x*y*exp(-0.5*alpha*r)/r;
+        }
+        else if(k==1){
+            return -alpha*(0.5*alpha*pow(y, 2) - r)*exp(-0.5*alpha*r)/r;
+        }
+        else{
+            return -0.5*pow(alpha, 2)*y*z*exp(-0.5*alpha*r)/r;
+        }
     }
+
+
     else if(j == 4){
-        return -1.0*alpha*(alpha*(0.5*x*z + 0.5*y*z + 0.5*pow(z, 2)) - 1.0*r)*exp(-0.5*alpha*r)/r;
+        if(k==0){
+            return -0.5*pow(alpha, 2)*x*z*exp(-0.5*alpha*r)/r;
+        }
+        else if(k==1){
+            return -0.5*pow(alpha, 2)*y*z*exp(-0.5*alpha*r)/r;
+        }
+        else{
+            return -alpha*(0.5*alpha*pow(z, 2) - r)*exp(-0.5*alpha*r)/r;
+        }
     }
     else{
         return 0;
@@ -743,61 +781,6 @@ double VMCSolver::Psi_second_derivative(const mat &positions, int i, int j){
         return 0;
     }
 }
-
-
-
-
-
-
-
-
-
-// Code under this are not completed
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-
-// Not at all completed
-// update Slater determinant effectively
-void VMCSolver::SlaterUpdating(const mat &r, mat &D_up_inv, mat &D_down_inv){
-    mat D_up_inv_new = zeros(nParticles/2, nParticles/2);
-    mat D_down_inv_new = zeros(nParticles/2, nParticles/2);
-
-    double D_sum = 0.0;
-
-    for(int k=0; k<nParticles/2; k++){
-        for(int j=0; j<nParticles/2; j++){
-            for(int i=0; i<nParticles/2; i++){
-                if(j != i){
-                    D_up_inv_new(k,j) = D_up_inv(k,j) - D_up_inv(k,j)/R*
-
-                }
-                else{
-
-
-
-                }
-            }
-        }
-    }
-
-}
-
-*/
 
 
 

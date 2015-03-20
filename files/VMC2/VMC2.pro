@@ -15,3 +15,5 @@ HEADERS += \
     lib.h \
     vmcsolver.h
 
+LIBS += -larmadillo -lblas -llapack
+
