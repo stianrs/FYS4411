@@ -15,7 +15,7 @@ using namespace arma;
 using namespace std;
 
 VMCSolver::VMCSolver():
-    AtomType("helium"),
+    AtomType("beryllium"),
     nDimensions(3),
 
     numerical_energySolver(true), // set true to solve integral numerical
@@ -31,15 +31,9 @@ VMCSolver::VMCSolver():
     h(0.001), // step used in numerical integration
     h2(1000000), // 1/h^2 used in numerical integration
     idum(time(0)) // random number generator, seed=time(0) for random seed
-
 {    
     r_distance = zeros(nParticles, nParticles); // distance between electrons
     r_radius = zeros(nParticles); // distance between nucleus and electrons
-
-    D_down_old = zeros(nParticles/2, nParticles/2);
-    D_down_new = zeros(nParticles/2, nParticles/2);
-    D_up_old = zeros(nParticles/2, nParticles/2);
-    D_up_new = zeros(nParticles/2, nParticles/2);
 }
 
 // function to run MC simualtions form main.cpp
@@ -76,16 +70,31 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
 
+    int n = nCycles*nParticles;
+
+    rOld = zeros<mat>(nParticles, nDimensions);
+    rNew = zeros<mat>(nParticles, nDimensions);
+
+    energy_single = zeros<vec>(n);;
+    energySquared_single = zeros<vec>(n);
+
+    D_down_old = zeros<mat>(nParticles/2, nParticles/2);
+    D_down_new = zeros<mat>(nParticles/2, nParticles/2);
+    D_up_old = zeros<mat>(nParticles/2, nParticles/2);
+    D_up_new = zeros<mat>(nParticles/2, nParticles/2);
+
+    QForceOld = zeros<mat>(nParticles, nDimensions);
+    QForceNew = zeros<mat>(nParticles, nDimensions);
+
+    SlaterGradientsOld = zeros<mat>(nParticles, nDimensions);
+    SlaterGradientsNew = zeros<mat>(nParticles, nDimensions);
+
+    energy_single = zeros<vec>(n);;
+    energySquared_single = zeros<vec>(n);
+
+
     if(deactivate_ImportanceSampling){
-        cout << "Without importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << numerical_energySolver << endl;
-
-        int n = nCycles*nParticles;
-
-        rOld = zeros<mat>(nParticles, nDimensions);
-        rNew = zeros<mat>(nParticles, nDimensions);
-
-        energy_single = zeros<vec>(n);;
-        energySquared_single = zeros<vec>(n);
+        cout << "Without importance sampling" << endl;
 
         double deltaE;
         double energySum = 0;
@@ -108,10 +117,13 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         }
         rNew = rOld;
 
+        // calculate Slater determinant for initial positions
         SlaterDeterminant(rNew);
 
-        D_down_old = D_down_new;
         D_up_old = D_up_new;
+        D_down_old = D_down_new;
+
+        compute_R_sd(0);
 
         // store initial position
         if (save_positions){
@@ -137,12 +149,14 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
                     rNew(i,j) = rOld(i,j) + stepLength*(ran2(&idum) - 0.5);
                 }
 
-                // Recalculate the value of the wave function
+                // Recalculate the Slater determinant
                 SlaterDeterminant(rNew);
 
                 compute_R_sd(i);
                 R_c = 1; // this has to be calculated
                 R = R_sd*R_c;
+
+                cout << R << endl; // ????????????? get problems here
 
                 // Check for step acceptance (if yes, update position, if no, reset position)
                 if(ran2(&idum) <= R*R) {
@@ -202,20 +216,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     }
 
     else{
-        cout << "With importance sampling" << "  Wavefunc_selection: " << deactivate_JastrowFactor << "  energySolver_selection: " << numerical_energySolver << endl;
-
-        int n = nCycles*nParticles;
-
-        rOld = zeros<mat>(nParticles, nDimensions);
-        rNew = zeros<mat>(nParticles, nDimensions);
-        QForceOld = zeros<mat>(nParticles, nDimensions);
-        QForceNew = zeros<mat>(nParticles, nDimensions);
-
-        SlaterGradientsOld = zeros<mat>(nParticles, nDimensions);
-        SlaterGradientsNew = zeros<mat>(nParticles, nDimensions);
-
-        energy_single = zeros<vec>(n);;
-        energySquared_single = zeros<vec>(n);
+        cout << "With importance sampling" << endl;
 
         double deltaE;
         double energySum = 0;
@@ -238,8 +239,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
         SlaterDeterminant(rNew);
 
-        D_down_old = D_down_new;
         D_up_old = D_up_new;
+        D_down_old = D_down_new;
+
+        compute_R_sd(0);
 
         // store initial position
         if (save_positions){
@@ -259,25 +262,12 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         // loop over Monte Carlo cycles
         for(int cycle = 0; cycle < nCycles; cycle++) {
 
-            // Store the current value of the wave function
-            D_down_old = D_down_new;//???????????????
-            D_up_old = D_up_new;
-
             QuantumForce(rOld, QForceOld);
 
             // New position to test
             for(int i = 0; i < nParticles; i++) {
                 for(int j = 0; j < nDimensions; j++) {
                     rNew(i,j) = rOld(i,j) + GaussianDeviate(&idum)*sqrt(timestep)+QForceOld(i,j)*timestep*D;
-                }
-                //  for the other particles we need to set the position to the old position since
-                //  we move only one particle at the time
-                for (int k = 0; k < nParticles; k++) {
-                    if ( k != i) {
-                        for (int j=0; j < nDimensions; j++) {
-                            rNew(k,j) = rOld(k,j);
-                        }
-                    }
                 }
 
                 // Recalculate the value of the wave function and the quantum force
@@ -488,9 +478,6 @@ void VMCSolver::fill_a_matrix(){
         if(i < nParticles/2){
             spin(i) = 1;
         }
-        else{
-            spin(i) = 0;
-        }
     }
     a_matrix = zeros(nParticles, nParticles);
     double  a;
@@ -536,21 +523,21 @@ double VMCSolver::psi2s(double &radius){
 // 2px hydrogenic orbital
 double VMCSolver::psi2px(double &x, double &radius){
     double psi2px;
-    psi2px = alpha*x*exp(-alpha*radius/2.0);
+    psi2px = x*exp(-alpha*radius/2.0);
     return psi2px;
 }
 
 // 2py hydrogenic orbital
 double VMCSolver::psi2py(double &y, double &radius){
     double psi2py;
-    psi2py = alpha*y*exp(-alpha*radius/2.0);
+    psi2py = y*exp(-alpha*radius/2.0);
     return psi2py;
 }
 
 // 2pz hydrogenic orbital
 double VMCSolver::psi2pz(double &z, double &radius){
     double psi2pz;
-    psi2pz = alpha*z*exp(-alpha*radius/2.0);
+    psi2pz = z*exp(-alpha*radius/2.0);
     return psi2pz;
 }
 
@@ -632,7 +619,6 @@ double VMCSolver::compute_R_sd(int k){
 // compute the quantum force used in importance sampling
 void VMCSolver::QuantumForce(const mat &r, mat &F)
 {
-
     for(int i = 0; i < nParticles; i++){
         Slater_first_derivative(i);
         for(int j = 0; j < nDimensions; j++) {
@@ -645,24 +631,22 @@ void VMCSolver::QuantumForce(const mat &r, mat &F)
 
 // compute slater first derivative
 void VMCSolver::Slater_first_derivative(int i){
-    cout << SlaterGradientsNew << endl;
     if(i < nParticles/2){
         for(int k=0; k<nDimensions; k++){
             double derivative_up = 0.0;
             for(int j=0; j<nParticles/2; j++){
-                derivative_up += (1.0/R_sd)*Psi_first_derivative(rNew, i, j, k)*D_up_old(j, i);
-                 cout << R_sd << endl; //??????????????? we get R_sd=0, so we get inf in derivative up, need value before calling quantum force
+                derivative_up += Psi_first_derivative(rNew, i, j, k)*D_up_old(j, i);
             }
-            SlaterGradientsNew(i,k) = derivative_up;
+            SlaterGradientsNew(i, k) = (1.0/R_sd)*derivative_up;
         }
     }
     else{
         for(int k=0; k<nDimensions; k++){
             double derivative_down = 0.0;
             for(int j=0; j<nParticles/2; j++){
-                derivative_down += (1.0/R_sd)*Psi_first_derivative(rNew, i+nParticles/2, j, k)*D_down_old(j, i);
+                derivative_down += Psi_first_derivative(rNew, i, j, k)*D_down_old(j, i-nParticles/2);
             }
-            SlaterGradientsNew(i,k) = derivative_down;
+            SlaterGradientsNew(i, k) = (1.0/R_sd)*derivative_down;
         }
     }
 }
@@ -709,39 +693,39 @@ double VMCSolver::Psi_first_derivative(const mat &positions, int i, int j, int k
 
     else if(j == 2){
         if(k==0){
-            return -alpha*(0.5*alpha*pow(x, 2) - r)*exp(-0.5*alpha*r)/r;
+            return -(0.5*alpha*x*x - r)*exp(-0.5*alpha*r)/r;
         }
         else if(k==1){
-            return -0.5*pow(alpha, 2)*x*y*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*x*y*exp(-0.5*alpha*r)/r;
         }
         else{
-            return -0.5*pow(alpha, 2)*x*z*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*x*z*exp(-0.5*alpha*r)/r;
         }
     }
 
 
     else if(j == 3){
         if(k==0){
-            return -0.5*pow(alpha, 2)*x*y*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*x*y*exp(-0.5*alpha*r)/r;
         }
         else if(k==1){
-            return -alpha*(0.5*alpha*pow(y, 2) - r)*exp(-0.5*alpha*r)/r;
+            return -(0.5*alpha*y*y - r)*exp(-0.5*alpha*r)/r;
         }
         else{
-            return -0.5*pow(alpha, 2)*y*z*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*y*z*exp(-0.5*alpha*r)/r;
         }
     }
 
 
     else if(j == 4){
         if(k==0){
-            return -0.5*pow(alpha, 2)*x*z*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*x*z*exp(-0.5*alpha*r)/r;
         }
         else if(k==1){
-            return -0.5*pow(alpha, 2)*y*z*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*y*z*exp(-0.5*alpha*r)/r;
         }
         else{
-            return -alpha*(0.5*alpha*pow(z, 2) - r)*exp(-0.5*alpha*r)/r;
+            return -(0.5*alpha*z*z - r)*exp(-0.5*alpha*r)/r;
         }
     }
     else{
@@ -762,20 +746,25 @@ double VMCSolver::Psi_second_derivative(const mat &positions, int i, int j){
     y = rNew(i, 1);
     z = rNew(i, 2);
 
+    double x2 = x*x;
+    double y2 = y*y;
+    double z2 = z*z;
+    double alpha2 = alpha*alpha;
+
     if(j == 0){
         return alpha*(alpha*r - 2)*exp(-alpha*r)/r;
     }
     else if(j == 1){
-        return -0.015625*alpha*(0.125*pow(alpha, 2)*pow(x, 2) + 0.125*pow(alpha, 2)*pow(y, 2) + 0.125*pow(alpha, 2)*pow(z, 2) - 1.25*alpha*r + 2.0)*exp(-0.5*alpha*r)/r;
+        return -0.015625*alpha*(0.125*alpha2*x2 + 0.125*alpha2*y2 + 0.125*alpha2*z2 - 1.25*alpha*r + 2.0)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 2){
-        return 0.0625*pow(alpha, 2)*x*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
+        return 0.0625*alpha2*x*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 3){
-        return 0.0625*pow(alpha, 2)*y*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
+        return 0.0625*alpha2*y*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 4){
-        return 0.0625*pow(alpha, 2)*z*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
+        return 0.0625*alpha2*z*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
     }
     else{
         return 0;

@@ -16,7 +16,7 @@ using namespace arma;
 int main()
 {
 
-    int nCycles = 10000000;
+    int nCycles = 1000000;
 
     VMCSolver *solver = new VMCSolver();
     solver->runMonteCarloIntegration(nCycles);
