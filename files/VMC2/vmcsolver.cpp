@@ -89,6 +89,14 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     SlaterGradientsOld = zeros<mat>(nParticles, nDimensions);
     SlaterGradientsNew = zeros<mat>(nParticles, nDimensions);
 
+    CorrelationsOld = zeros<mat>(nParticles, nParticles);
+    CorrelationsNew = zeros<mat>(nParticles, nParticles);
+
+    JastrowGradientNew = zeros<mat>(nParticles, nParticles);
+    JastrowGradientOld = zeros<mat>(nParticles, nParticles);
+    JastrowLaplacianNew = zeros<mat>(nParticles, nParticles);
+    JastrowLaplacianOld = zeros<mat>(nParticles, nParticles);
+
     energy_single = zeros<vec>(n);;
     energySquared_single = zeros<vec>(n);
 
@@ -165,6 +173,11 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
                         D_down_old = D_down_new;
                         D_up_old = D_up_new;
+
+                        CorrelationsOld = CorrelationsNew;
+                        JastrowGradientOld = JastrowGradientNew;
+                        JastrowLaplacianOld = JastrowLaplacianNew;
+
 
                     }
                     acceptCounter += 1;
@@ -295,6 +308,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
                         D_down_old = D_down_new;
                         D_up_old = D_up_new;
+
+                        CorrelationsOld = CorrelationsNew;
+                        JastrowGradientOld = JastrowGradientNew;
+                        JastrowLaplacianOld = JastrowLaplacianNew;
                     }
                     acceptCounter += 1;
                     counter2 += 1;
@@ -355,7 +372,7 @@ double VMCSolver::localEnergy(const mat &r)
     if (numerical_energySolver){
 
         // Kinetic energy
-        double kineticEnergy = Slater_second_derivative();
+        double kineticEnergy = SlaterLaplacian();
 
         kineticEnergy = -0.5*kineticEnergy;
 
@@ -428,13 +445,6 @@ double VMCSolver::localEnergy(const mat &r)
 }
 
 
-// function that compute wavefunctions given with to compute bu user
-double VMCSolver::waveFunction(const mat &r)
-{
-
-}
-
-
 
 // compute the distance between all electrons in the atom and the distance from the nucleus
 void VMCSolver::r_func(const mat &positions){
@@ -494,16 +504,234 @@ void VMCSolver::fill_a_matrix(){
     }
 }
 
-// compute the Jastrow factor
-double VMCSolver::JastrowFactor(){
-    double Psi = 1.0;
-    for(int j=0; j < nParticles; j++){
-        for(int i=0; i < j; i++){
-            Psi *= exp((a_matrix(i,j)*r_distance(i,j))/(1.0 + beta*r_distance(i,j)));
+
+
+// compute the Slater determinant
+void VMCSolver::SlaterDeterminant(const mat &positions){
+    mat D_up = zeros(nParticles/2, nParticles/2);
+    mat D_down = zeros(nParticles/2, nParticles/2);
+
+    // compute spinn up part and spin down part
+    for(int j=0; j<nParticles/2; j++){
+        for(int i=0; i<nParticles/2; i++){
+            D_up(i,j) = SlaterPsi(positions, i, j);
+            D_down(i,j) = SlaterPsi(positions, i+nParticles/2, j);
         }
     }
-    return Psi;
+    D_up_new = inv(D_up);
+    D_down_new = inv(D_down);
 }
+
+
+
+// compute the R_sd ratio
+double VMCSolver::compute_R_sd(int k){
+
+    R_sd = 0.0;
+
+    if (k < nParticles/2){
+        for(int i=0; i<nParticles/2; i++){
+            for(int j=0; j<nParticles/2; j++){
+                R_sd += SlaterPsi(rNew, i, j)*D_up_old(j, i);
+            }
+        }
+    }
+    else{
+        for(int i=0; i<nParticles/2; i++){
+            for(int j=0; j<nParticles/2; j++){
+                R_sd += SlaterPsi(rNew, i+nParticles/2, j)*D_down_old(j, i);
+            }
+        }
+    }
+    return R_sd;
+}
+
+
+
+// compute slater first derivative
+void VMCSolver::SlaterGradient(int i){
+    if(i < nParticles/2){
+        for(int k=0; k<nDimensions; k++){
+            double derivative_up = 0.0;
+            for(int j=0; j<nParticles/2; j++){
+                derivative_up += Psi_first_derivative(rNew, i, j, k)*D_up_old(j, i);
+            }
+            SlaterGradientsNew(i, k) = (1.0/R_sd)*derivative_up;
+        }
+    }
+    else{
+        for(int k=0; k<nDimensions; k++){
+            double derivative_down = 0.0;
+            for(int j=0; j<nParticles/2; j++){
+                derivative_down += Psi_first_derivative(rNew, i, j, k)*D_down_old(j, i-nParticles/2);
+            }
+            SlaterGradientsNew(i, k) = (1.0/R_sd)*derivative_down;
+        }
+    }
+}
+
+
+// compute slater second derivative
+double VMCSolver::SlaterLaplacian(){
+    double derivative_up = 0.0;
+    double derivative_down = 0.0;
+
+    for(int i=0; i<nParticles/2; i++){
+        for(int j=0; j<nParticles/2; j++){
+            derivative_up += Psi_second_derivative(rNew, i, j)*D_up_old(j, i);
+            derivative_down += Psi_second_derivative(rNew, i+nParticles/2, j)*D_down_old(j, i);
+        }
+    }
+    double derivative_sum = derivative_up + derivative_down;
+    return derivative_sum;
+}
+
+
+// compute the Jastrow factor
+double VMCSolver::ComputeJastrow(const mat &positions){
+    double corr = 0.0;
+
+    r_func(positions);
+    for(int k=0; k < nParticles; k++){
+        for(int i=k+1; i < nParticles; i++){
+            corr += a_matrix(k,i)*r_distance(k,i)/(1.0 + beta*r_distance(k,i));
+        }
+    }
+    corr = exp(corr);
+    return corr;
+}
+
+
+
+void VMCSolver::fillJastrowMatrix(const mat &CorrelationMatrix, const mat &positions){
+    r_func(positions);
+    for(int k=0; k < nParticles; k++){
+        for(int i=k+1; i < nParticles; i++){
+            CorrelationMatrix(k, i) = a_matrix(k,i)*r_distance(k,i)/(1.0 + beta*r_distance(k,i));
+        }
+    }
+}
+
+
+
+void VMCSolver::compute_R_c(){
+    double deltaU = 0.0;
+
+    for(int k=0; k < nParticles; k++){
+        for(int i=0; i < k; i++){
+            deltaU += CorrelationsNew(i, k) - CorrelationsOld(i, k);
+        }
+        for(int i=k+1; i < nParticles; i++){
+            deltaU += CorrelationsNew(k, i) - CorrelationsOld(k, i);
+        }
+    }
+    R_c = exp(deltaU);
+}
+
+
+
+double VMCSolver::computeJastrowGradient(const mat &positions, int k){
+    r_func(positions);
+    for(int i=0; i < k; i++){
+        double divisor = 1.0 + beta*r_distance(i, k);
+        JastrowGradientNew(i, k) = a_matrix(i, k)/(divisor*divisor);
+    }
+    for(int i=k+1; i < nParticles; i++){
+        double divisor = 1.0 + beta*r_distance(k, i);
+        JastrowGradientNew(k, i) = a_matrix(k, i)/(divisor*divisor);
+    }
+}
+
+
+double VMCSolver::computeJastrowLaplacian(const mat &positions, int k){
+    r_func(positions);
+    for(int i=0; i < k; i++){
+        double divisor = 1.0 + beta*r_distance(i, k);
+        JastrowLaplacianNew(i, k) = -2.0*a_matrix(i, k)*beta/(divisor*divisor*divisor);
+    }
+    for(int i=k+1; i < nParticles; i++){
+        double divisor = 1.0 + beta*r_distance(k, i);
+        JastrowLaplacianNew(k, i) = -2.0*a_matrix(k, i)*beta/(divisor*divisor*divisor);
+    }
+}
+
+// OBS! Be sure Quantumforce is called before this function is used!!
+double VMCSolver::computeJastrowEnergy(){
+    double sum = 0.0;
+    for(int k=0; k<nParticles; k++){
+        for(int i = 0; i<k; i++) {
+            sum += (nDimensions - 1)/r_distance(i, k)*JastrowGradientNew(i, k) + JastrowLaplacianNew(i, k);
+        }
+        for(int i=k+1; i<nParticles; i++) {
+            sum += (nDimensions - 1)/r_distance(k, i)*JastrowGradientNew(k, i) + JastrowLaplacianNew(k, i);
+        }
+    }
+    return JastrowGradientSquared -0.5*sum;
+}
+
+
+void VMCSolver::updateCorrelationsMatrix(mat &CorrelationsMatrix, int k){
+    for(int i=0; i<k; i++) {
+        CorrelationsMatrix(i, k) = a_matrix(i,k)*r_distance(i,k)/(1.0 + beta*r_distance(i,k));
+    }
+    for(int i=(k+1); i<nParticles; i++) {
+        CorrelationsMatrix(k, i) = a_matrix(k,i)*r_distance(k,i)/(1.0 + beta*r_distance(k,i));
+    }
+}
+
+
+
+// !!!!!!!!!!!! Fix this
+void VMCSolver::updateSlaterDeterminant(mat& D_new, const mat& D_old){
+
+    int o = i + nParticles/2*p;
+    for(int k=0; k<nParticles/2; k++){
+        for(int j = 0; j<nParticles/2; j++){
+
+
+            if(j != i) {
+                double sum = 0;
+                for(int l=0; l<nParticles/2; l++){
+                    sum += D_old(l,j)*D_old(rNew, r, o, l);
+                }
+                D_new(k,j) = D_old(k,j) - D_old(k, i)*sum/R;
+            }
+            else{
+                D_new(k,j) = D_old(k,i)/R;
+            }
+        }
+    }
+}
+
+
+
+
+// ??? Why do SlaterGradientsNew(i,j)^2 vanish? Matrix property?
+// compute the quantum force used in importance sampling
+void VMCSolver::QuantumForce(const mat &r, mat &F)
+{
+    JastrowGradientSquared = 0.0;
+    for(int i = 0; i < nParticles; i++){
+        SlaterGradient(i);
+        for(int j = 0; j < nDimensions; j++) {
+            double sum = 0.0;
+            for(k=0; k<i; k++){
+                sum += (r(i,j)-r(k,j))/r_distance(k,i)*JastrowGradientNew(k,i);
+            }
+            for(k=i+1; k<nParticles; k++){
+                sum -= (r(k,j)-r(i,j))/r_distance(i,k)*JastrowGradientNew(i,k);
+            }
+            F(i,j) =  2.0*(SlaterGradientsNew(i,j) + sum);
+            JastrowGradientSquared -= 0.5*sum*sum + SlaterGradientsNew(i,j)*sum;
+        }
+    }
+}
+
+
+
+
+
+
 
 
 // 1s hydrogenic orbital
@@ -573,99 +801,6 @@ double VMCSolver::SlaterPsi(const mat &positions, int i, int j){
     }
 }
 
-
-// compute the Slater determinant
-void VMCSolver::SlaterDeterminant(const mat &positions){
-    mat D_up = zeros(nParticles/2, nParticles/2);
-    mat D_down = zeros(nParticles/2, nParticles/2);
-
-    // compute spinn up part and spin down part
-    for(int j=0; j<nParticles/2; j++){
-        for(int i=0; i<nParticles/2; i++){
-            D_up(i,j) = SlaterPsi(positions, i, j);
-            D_down(i,j) = SlaterPsi(positions, i+nParticles/2, j);
-        }
-    }
-    D_up_new = inv(D_up);
-    D_down_new = inv(D_down);
-}
-
-
-
-// compute the R_sd ratio
-double VMCSolver::compute_R_sd(int k){
-
-    R_sd = 0.0;
-
-    if (k < nParticles/2){
-        for(int i=0; i<nParticles/2; i++){
-            for(int j=0; j<nParticles/2; j++){
-                R_sd += SlaterPsi(rNew, i, j)*D_up_old(j, i);
-            }
-        }
-    }
-    else{
-        for(int i=0; i<nParticles/2; i++){
-            for(int j=0; j<nParticles/2; j++){
-                R_sd += SlaterPsi(rNew, i+nParticles/2, j)*D_down_old(j, i);
-            }
-        }
-    }
-    return R_sd;
-}
-
-
-
-// compute the quantum force used in importance sampling
-void VMCSolver::QuantumForce(const mat &r, mat &F)
-{
-    for(int i = 0; i < nParticles; i++){
-        Slater_first_derivative(i);
-        for(int j = 0; j < nDimensions; j++) {
-            F(i,j) =  2.0*SlaterGradientsNew(i,j);
-        }
-    }
-}
-
-
-
-// compute slater first derivative
-void VMCSolver::Slater_first_derivative(int i){
-    if(i < nParticles/2){
-        for(int k=0; k<nDimensions; k++){
-            double derivative_up = 0.0;
-            for(int j=0; j<nParticles/2; j++){
-                derivative_up += Psi_first_derivative(rNew, i, j, k)*D_up_old(j, i);
-            }
-            SlaterGradientsNew(i, k) = (1.0/R_sd)*derivative_up;
-        }
-    }
-    else{
-        for(int k=0; k<nDimensions; k++){
-            double derivative_down = 0.0;
-            for(int j=0; j<nParticles/2; j++){
-                derivative_down += Psi_first_derivative(rNew, i, j, k)*D_down_old(j, i-nParticles/2);
-            }
-            SlaterGradientsNew(i, k) = (1.0/R_sd)*derivative_down;
-        }
-    }
-}
-
-
-// compute slater second derivative
-double VMCSolver::Slater_second_derivative(){
-    double derivative_up = 0.0;
-    double derivative_down = 0.0;
-
-    for(int i=0; i<nParticles/2; i++){
-        for(int j=0; j<nParticles/2; j++){
-            derivative_up += Psi_second_derivative(rNew, i, j)*D_up_old(j, i);
-            derivative_down += Psi_second_derivative(rNew, i+nParticles/2, j)*D_down_old(j, i);
-        }
-    }
-    double derivative_sum = derivative_up + derivative_down;
-    return derivative_sum;
-}
 
 
 // Gradient of orbitals used in quantum force

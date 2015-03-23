@@ -26,7 +26,6 @@ public:
 
 private:
     void SetParametersAtomType(string AtomType);
-    double waveFunction(const mat &r);
     double localEnergy(const mat &r);
     void r_func(const mat &positions);
     void save_positions_func(const mat &r, fstream &outfile);
@@ -43,8 +42,8 @@ private:
     double SlaterPsi(const mat &positions, int i, int j);
     void SlaterDeterminant(const mat &positions);
     double compute_R_sd(int k);
-    void Slater_first_derivative(int i);
-    double Slater_second_derivative();
+    void SlaterGradient(int i);
+    double SlaterLaplacian();
     double Psi_first_derivative(const mat &positions, int i, int j, int k);
     double Psi_second_derivative(const mat &positions, int i, int j);
 
@@ -93,12 +92,21 @@ private:
     double R_sd;
     double R_c;
     double R;
+    double JastrowGradientSquared;
+
     mat D_down_old;
     mat D_down_new;
     mat D_up_old;
     mat D_up_new;
     mat SlaterGradientsOld;
     mat SlaterGradientsNew;
+
+    mat CorrelationsOld;
+    mat CorrelationsNew;
+    mat JastrowGradientNew;
+    mat JastrowGradientOld;
+    mat JastrowLaplacianNew;
+    mat JastrowLaplacianOld;
 
 };
 
