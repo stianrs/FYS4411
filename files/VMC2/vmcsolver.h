@@ -25,6 +25,7 @@ public:
 
 
 private:
+    double waveFunction(const mat &r);
     void SetParametersAtomType(string AtomType);
     double localEnergy(const mat &r);
     void r_func(const mat &positions);
@@ -46,6 +47,16 @@ private:
     double SlaterLaplacian();
     double Psi_first_derivative(const mat &positions, int i, int j, int k);
     double Psi_second_derivative(const mat &positions, int i, int j);
+
+    double ComputeJastrow(const mat &positions);
+    void fillJastrowMatrix(mat &CorrelationMatrix, const mat &positions);
+    void compute_R_c();
+    double computeJastrowGradient(const mat &positions, int k);
+    double computeJastrowLaplacian(const mat &positions, int k);
+    double computeJastrowEnergy();
+    void updateCorrelationsMatrix(mat &CorrelationsMatrix, int k);
+
+    void updateSlaterDeterminant(mat& D_new, const mat& D_old, int i, int selector);
 
 
     string AtomType;
@@ -101,8 +112,8 @@ private:
     mat SlaterGradientsOld;
     mat SlaterGradientsNew;
 
-    mat CorrelationsOld;
-    mat CorrelationsNew;
+    mat C_old;
+    mat C_new;
     mat JastrowGradientNew;
     mat JastrowGradientOld;
     mat JastrowLaplacianNew;

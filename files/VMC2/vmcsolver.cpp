@@ -15,13 +15,13 @@ using namespace arma;
 using namespace std;
 
 VMCSolver::VMCSolver():
-    AtomType("beryllium"),
+    AtomType("helium"),
     nDimensions(3),
 
     numerical_energySolver(true), // set true to solve integral numerical
 
     deactivate_JastrowFactor(true), // set false to activate importance sampling
-    deactivate_ImportanceSampling(false), // set false to activate importance sampling
+    deactivate_ImportanceSampling(true), // set false to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
 
     timestep(0.002), // timestep used in importance sampling
@@ -59,6 +59,13 @@ void VMCSolver::SetParametersAtomType(string AtomType){
         beta = 0.1;
         stepLength = 1.4;
     }
+    else if(AtomType == "neon"){
+        charge = 10;
+        nParticles = 10;
+        alpha = 10.2;
+        beta = 0.09;
+        stepLength = 1.0;
+    }
 }
 
 
@@ -89,8 +96,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     SlaterGradientsOld = zeros<mat>(nParticles, nDimensions);
     SlaterGradientsNew = zeros<mat>(nParticles, nDimensions);
 
-    CorrelationsOld = zeros<mat>(nParticles, nParticles);
-    CorrelationsNew = zeros<mat>(nParticles, nParticles);
+    C_old = zeros<mat>(nParticles, nParticles);
+    C_new = zeros<mat>(nParticles, nParticles);
 
     JastrowGradientNew = zeros<mat>(nParticles, nParticles);
     JastrowGradientOld = zeros<mat>(nParticles, nParticles);
@@ -125,13 +132,21 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         }
         rNew = rOld;
 
-        // calculate Slater determinant for initial positions
+        // calculate Slater determinant and Jastrow for initial positions
         SlaterDeterminant(rNew);
+        fillJastrowMatrix(C_new, rNew);
+
+        computeJastrowGradient(rNew, 0);
+        computeJastrowLaplacian(rNew, 0);
 
         D_up_old = D_up_new;
         D_down_old = D_down_new;
+        C_old = C_new;
+        JastrowGradientOld = JastrowGradientNew;
+        JastrowLaplacianOld = JastrowLaplacianNew;
 
         compute_R_sd(0);
+        compute_R_c();
 
         // store initial position
         if (save_positions){
@@ -159,12 +174,13 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
                 // Recalculate the Slater determinant
                 SlaterDeterminant(rNew);
+                fillJastrowMatrix(C_new, rNew);
 
                 compute_R_sd(i);
-                R_c = 1; // this has to be calculated
+                compute_R_c();
                 R = R_sd*R_c;
 
-                cout << R << endl; // ????????????? get problems here
+                //cout << R << endl; // ????????????? get problems here
 
                 // Check for step acceptance (if yes, update position, if no, reset position)
                 if(ran2(&idum) <= R*R) {
@@ -174,10 +190,9 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
                         D_down_old = D_down_new;
                         D_up_old = D_up_new;
 
-                        CorrelationsOld = CorrelationsNew;
+                        C_old = C_new;
                         JastrowGradientOld = JastrowGradientNew;
                         JastrowLaplacianOld = JastrowLaplacianNew;
-
 
                     }
                     acceptCounter += 1;
@@ -251,11 +266,19 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         rNew = rOld;
 
         SlaterDeterminant(rNew);
+        fillJastrowMatrix(C_new, rNew);
+
+        computeJastrowGradient(rNew, 0);
+        computeJastrowLaplacian(rNew, 0);
 
         D_up_old = D_up_new;
         D_down_old = D_down_new;
+        C_old = C_new;
+        JastrowGradientOld = JastrowGradientNew;
+        JastrowLaplacianOld = JastrowLaplacianNew;
 
         compute_R_sd(0);
+        compute_R_c();
 
         // store initial position
         if (save_positions){
@@ -285,7 +308,12 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
                 // Recalculate the value of the wave function and the quantum force
                 SlaterDeterminant(rNew);
+
+                computeJastrowGradient(rNew, i);
+                computeJastrowLaplacian(rNew, i);
+
                 QuantumForce(rNew,QForceNew);
+                fillJastrowMatrix(C_new, rNew);
 
                 //  we compute the log of the ratio of the greens functions to be used in the
                 //  Metropolis-Hastings algorithm
@@ -297,7 +325,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
                 GreensFunction = exp(GreensFunction);
 
                 compute_R_sd(i);
-                R_c = 1; // this has to be calculated
+                compute_R_c();
                 R = R_sd*R_c;
 
                 // The Metropolis test is performed by moving one particle at the time
@@ -309,7 +337,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
                         D_down_old = D_down_new;
                         D_up_old = D_up_new;
 
-                        CorrelationsOld = CorrelationsNew;
+                        C_old = C_new;
                         JastrowGradientOld = JastrowGradientNew;
                         JastrowLaplacianOld = JastrowLaplacianNew;
                     }
@@ -360,6 +388,11 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
         cout << "Energy: " << energy_mean << " Variance: " << variance <<  " Averange distance r_ij: " << r_ij_sum/r_ij_counter << endl;
         cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << cpu_time << " sec" << endl;
     }
+}
+
+double VMCSolver::waveFunction(const mat &r)
+{
+
 }
 
 
@@ -603,7 +636,7 @@ double VMCSolver::ComputeJastrow(const mat &positions){
 
 
 
-void VMCSolver::fillJastrowMatrix(const mat &CorrelationMatrix, const mat &positions){
+void VMCSolver::fillJastrowMatrix(mat &CorrelationMatrix, const mat &positions){
     r_func(positions);
     for(int k=0; k < nParticles; k++){
         for(int i=k+1; i < nParticles; i++){
@@ -619,10 +652,10 @@ void VMCSolver::compute_R_c(){
 
     for(int k=0; k < nParticles; k++){
         for(int i=0; i < k; i++){
-            deltaU += CorrelationsNew(i, k) - CorrelationsOld(i, k);
+            deltaU += C_new(i, k) - C_old(i, k);
         }
         for(int i=k+1; i < nParticles; i++){
-            deltaU += CorrelationsNew(k, i) - CorrelationsOld(k, i);
+            deltaU += C_new(k, i) - C_old(k, i);
         }
     }
     R_c = exp(deltaU);
@@ -681,20 +714,18 @@ void VMCSolver::updateCorrelationsMatrix(mat &CorrelationsMatrix, int k){
 
 
 
-// !!!!!!!!!!!! Fix this
-void VMCSolver::updateSlaterDeterminant(mat& D_new, const mat& D_old){
 
-    int o = i + nParticles/2*p;
+void VMCSolver::updateSlaterDeterminant(mat& D_new, const mat& D_old, int i, int selector){
+
     for(int k=0; k<nParticles/2; k++){
-        for(int j = 0; j<nParticles/2; j++){
+        for(int j=0; j<nParticles/2; j++){
 
-
-            if(j != i) {
+            if(j!=i){
                 double sum = 0;
                 for(int l=0; l<nParticles/2; l++){
-                    sum += D_old(l,j)*D_old(rNew, r, o, l);
+                    sum += SlaterPsi(rNew, i+nParticles/2*selector, l)*D_old(l,j);
                 }
-                D_new(k,j) = D_old(k,j) - D_old(k, i)*sum/R;
+                D_new(k,j) = D_old(k,j) - D_old(k,i)*sum/R;
             }
             else{
                 D_new(k,j) = D_old(k,i)/R;
@@ -715,10 +746,10 @@ void VMCSolver::QuantumForce(const mat &r, mat &F)
         SlaterGradient(i);
         for(int j = 0; j < nDimensions; j++) {
             double sum = 0.0;
-            for(k=0; k<i; k++){
+            for(int k=0; k<i; k++){
                 sum += (r(i,j)-r(k,j))/r_distance(k,i)*JastrowGradientNew(k,i);
             }
-            for(k=i+1; k<nParticles; k++){
+            for(int k=i+1; k<nParticles; k++){
                 sum -= (r(k,j)-r(i,j))/r_distance(i,k)*JastrowGradientNew(i,k);
             }
             F(i,j) =  2.0*(SlaterGradientsNew(i,j) + sum);
