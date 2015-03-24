@@ -45,18 +45,18 @@ private:
     double compute_R_sd(int k);
     void SlaterGradient(int i);
     double SlaterLaplacian();
-    double Psi_first_derivative(const mat &positions, int i, int j, int k);
-    double Psi_second_derivative(const mat &positions, int i, int j);
+    double Psi_first_derivative(int i, int j, int k);
+    double Psi_second_derivative(int i, int j);
 
-    double ComputeJastrow(const mat &positions);
-    void fillJastrowMatrix(mat &CorrelationMatrix, const mat &positions);
+    double ComputeJastrow();
+    void fillJastrowMatrix(mat &CorrelationMatrix);
     void compute_R_c();
-    double computeJastrowGradient(const mat &positions, int k);
-    double computeJastrowLaplacian(const mat &positions, int k);
+    void computeJastrowGradient(int k);
+    void computeJastrowLaplacian(int k);
     double computeJastrowEnergy();
-    void updateCorrelationsMatrix(mat &CorrelationsMatrix, int k);
 
-    void updateSlaterDeterminant(mat& D_new, const mat& D_old, int i, int selector);
+    void update_D(mat& D_new, const mat& D_old, int i, int selector);
+    void update_C(mat &CorrelationsMatrix, int k);
 
 
     string AtomType;
@@ -64,8 +64,7 @@ private:
     int nDimensions;
 
     bool numerical_energySolver;
-    bool deactivate_JastrowFactor;
-    bool deactivate_ImportanceSampling;
+    bool activate_JastrowFactor;
     bool save_positions;
 
     //  we fix the time step  for the gaussian deviate
@@ -104,6 +103,9 @@ private:
     double R_c;
     double R;
     double JastrowGradientSquared;
+    double JastrowOld;
+    double JastrowNew;
+    double SlaterLaplacianValue;
 
     mat D_down_old;
     mat D_down_new;
