@@ -15,7 +15,7 @@ using namespace arma;
 using namespace std;
 
 VMCSolver::VMCSolver():
-    AtomType("helium"),
+    AtomType("beryllium"),
     nDimensions(3),
 
     numerical_energySolver(true), // set true to solve integral numerical
@@ -27,13 +27,14 @@ VMCSolver::VMCSolver():
 
     h(0.001), // step used in numerical integration
     h2(1000000), // 1/h^2 used in numerical integration
-    idum(time(0)) // random number generator, seed=time(0) for random seed
+    //idum(time(0)) // random number generator, seed=time(0) for random seed
+    idum(-1)
 {    
     r_distance = zeros(nParticles, nParticles); // distance between electrons
     r_radius = zeros(nParticles); // distance between nucleus and electrons
 }
 
-// function to run MC simualtions form main.cpp
+// function to run MC simualtions from main.cpp
 void VMCSolver::runMonteCarloIntegration(int nCycles)
 {
     fstream outfile;
@@ -129,25 +130,22 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     SlaterDeterminant(rNew);
     D_up_old = D_up_new;
     D_down_old = D_down_new;
-    SlaterLaplacianValue = SlaterLaplacian();
+
+    //SlaterLaplacianValue = SlaterLaplacian();
 
     for(int i=0; i<nParticles; i++){
         SlaterGradient(i);
     }
     SlaterGradientsOld = SlaterGradientsNew;
 
-
     // Compute everything about Jastrowfactor
     R_c = 1.0;
     if (activate_JastrowFactor){
-        fillJastrowMatrix(C_new); // Remove rNew from function !!!!!!!!!!!
+        fillJastrowMatrix(C_new);
         C_old = C_new;
         compute_R_c();
 
-        JastrowNew = ComputeJastrow();
-        JastrowOld = JastrowNew;
-
-        JastrowGradientOld = JastrowGradientNew;
+        JastrowGradientOld = JastrowGradientNew; // Probably not necessary JastrowGradientOld
         JastrowLaplacianOld = JastrowLaplacianNew;
 
         for(int i=0; i<nParticles; i++){
@@ -188,6 +186,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
             // Update r_distance and r_radius
             r_func(rNew);
 
+            compute_R_sd(i);
+
             // Recalculate Slater matrices D
             if(i<nParticles/2){
                 update_D(D_up_new, D_up_old, i, 0);
@@ -195,6 +195,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
             else{
                 update_D(D_down_new, D_down_old, i, 1);
             }
+
 
             if (activate_JastrowFactor){
                 update_C(C_new, i);
@@ -214,36 +215,56 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
             }
             GreensFunction = exp(GreensFunction);
 
-            compute_R_sd(i);
             R = R_sd*R_c;
 
             // The Metropolis test is performed by moving one particle at the time
             if(ran2(&idum) <= GreensFunction*R*R){
-                rOld = rNew; // should use an algorithm only changing necessary values!!!!!!
+                for(int j = 0; j < nDimensions; j++) {
+                    rOld(i,j) = rNew(i,j);
+                }
+
                 QForceOld = QForceNew;
-                D_down_old = D_down_new;
-                D_up_old = D_up_new;
                 C_old = C_new;
-                JastrowOld = JastrowNew; // This has to be used in an effisient algorithm for updating C_new !!!!!!!!!!!!!!!!!!!!!
+
+                SlaterGradientsOld = SlaterGradientsNew; // SlaterGradientsOld probably totally unesscesary
                 JastrowGradientOld = JastrowGradientNew;
                 JastrowLaplacianOld = JastrowLaplacianNew;
 
-                acceptCounter += 1;
-                counter2 += 1;
+                // See later
+                D_up_old = D_up_new;
+                D_down_old = D_down_new;
 
+                /*
+                // NB??????  D_old in Slater laplacian, is this correct? or update
                 if(i<nParticles/2){
                     update_D(D_up_new, D_up_old, i, 0);
                 }
                 else{
                     update_D(D_down_new, D_down_old, i, 1);
                 }
+                */
+
+                acceptCounter += 1;
+                counter2 += 1;
             }
 
             else {
-                for(int j = 0; j < nDimensions; j++) {
+                for(int j=0; j<nDimensions; j++) {
                     rNew(i,j) = rOld(i,j);
-                    QForceNew(i,j) = QForceOld(i,j);
                 }
+
+                r_func(rOld);
+
+                QForceNew = QForceOld;
+                C_new = C_old;
+
+                SlaterGradientsNew = SlaterGradientsOld; // SlaterGradientsOld probably totally unesscesary
+                JastrowGradientNew = JastrowGradientOld;
+                JastrowLaplacianNew = JastrowLaplacianOld;
+
+                D_up_new = D_up_old;
+                D_down_new = D_down_old;
+
                 counter2 += 1;
             }
 
@@ -458,22 +479,17 @@ void VMCSolver::SlaterDeterminant(const mat &positions){
 
 
 // compute the R_sd ratio
-double VMCSolver::compute_R_sd(int k){
-
+double VMCSolver::compute_R_sd(int i){
     R_sd = 0.0;
 
-    if (k < nParticles/2){
-        for(int i=0; i<nParticles/2; i++){
-            for(int j=0; j<nParticles/2; j++){
-                R_sd += SlaterPsi(rNew, i, j)*D_up_old(j, i);
-            }
+    if(i < nParticles/2){
+        for(int j=0; j<nParticles/2; j++){
+            R_sd += SlaterPsi(rNew, i, j)*D_up_old(j, i);
         }
     }
     else{
-        for(int i=0; i<nParticles/2; i++){
-            for(int j=0; j<nParticles/2; j++){
-                R_sd += SlaterPsi(rNew, i+nParticles/2, j)*D_down_old(j, i);
-            }
+        for(int j=0; j<nParticles/2; j++){
+            R_sd += SlaterPsi(rNew, i, j)*D_down_old(j, i-nParticles/2);
         }
     }
     return R_sd;
@@ -575,11 +591,11 @@ void VMCSolver::computeJastrowGradient(int k){
 
 
 void VMCSolver::computeJastrowLaplacian(int k){
-    for(int i=0; i < k; i++){
+    for(int i=0; i<k; i++){
         double divisor = 1.0 + beta*r_distance(i, k);
         JastrowLaplacianNew(i, k) = -2.0*a_matrix(i, k)*beta/(divisor*divisor*divisor);
     }
-    for(int i=k+1; i < nParticles; i++){
+    for(int i=k+1; i<nParticles; i++){
         double divisor = 1.0 + beta*r_distance(k, i);
         JastrowLaplacianNew(k, i) = -2.0*a_matrix(k, i)*beta/(divisor*divisor*divisor);
     }
@@ -589,14 +605,14 @@ void VMCSolver::computeJastrowLaplacian(int k){
 double VMCSolver::computeJastrowEnergy(){
     double sum = 0.0;
     for(int k=0; k<nParticles; k++){
-        for(int i = 0; i<k; i++) {
+        for(int i=0; i<k; i++) {
             sum += (nDimensions - 1)/r_distance(i, k)*JastrowGradientNew(i, k) + JastrowLaplacianNew(i, k);
         }
         for(int i=k+1; i<nParticles; i++) {
             sum += (nDimensions - 1)/r_distance(k, i)*JastrowGradientNew(k, i) + JastrowLaplacianNew(k, i);
         }
     }
-    return JastrowGradientSquared -0.5*sum;
+    return JastrowGradientSquared - 0.5*sum;
 }
 
 
@@ -612,10 +628,10 @@ void VMCSolver::update_D(mat& D_new, const mat& D_old, int i, int selector){
                 for(int l=0; l<nParticles/2; l++){
                     sum += SlaterPsi(rNew, i, l)*D_old(l,j);
                 }
-                D_new(k,j) = D_old(k,j) - D_old(k, i - nParticles/2*selector)*sum/R;
+                D_new(k,j) = D_old(k,j) - D_old(k, i - nParticles/2*selector)*sum/R_sd;
             }
             else{
-                D_new(k,j) = D_old(k,i)/R;
+                D_new(k,j) = D_old(k, i - nParticles/2*selector)/R_sd;
             }
         }
     }
@@ -627,7 +643,7 @@ void VMCSolver::update_C(mat &CorrelationsMatrix, int k){
     for(int i=0; i<k; i++) {
         CorrelationsMatrix(i, k) = a_matrix(i,k)*r_distance(i,k)/(1.0 + beta*r_distance(i,k));
     }
-    for(int i=(k+1); i<nParticles; i++) {
+    for(int i=k+1; i<nParticles; i++) {
         CorrelationsMatrix(k, i) = a_matrix(k,i)*r_distance(k,i)/(1.0 + beta*r_distance(k,i));
     }
 }
@@ -642,17 +658,23 @@ void VMCSolver::update_C(mat &CorrelationsMatrix, int k){
 void VMCSolver::QuantumForce(const mat &r, mat &F)
 {
     JastrowGradientSquared = 0.0;
-    for(int i = 0; i < nParticles; i++){
-        for(int j = 0; j < nDimensions; j++) {
-            double sum = 0.0;
-            for(int k=0; k<i; k++){
-                sum += (r(i,j)-r(k,j))/r_distance(k,i)*JastrowGradientNew(k,i);
+    for(int i=0; i<nParticles; i++){
+        for(int j=0; j<nDimensions; j++){
+
+            if(activate_JastrowFactor){
+                double sum = 0.0;
+                for(int k=0; k<i; k++){
+                    sum += (r(i,j)-r(k,j))/r_distance(k,i)*JastrowGradientNew(k,i);
+                }
+                for(int k=i+1; k<nParticles; k++){
+                    sum -= (r(k,j)-r(i,j))/r_distance(i,k)*JastrowGradientNew(i,k);
+                }
+                F(i,j) =  2.0*(SlaterGradientsNew(i,j) + sum);
+                JastrowGradientSquared -= 0.5*sum*sum + SlaterGradientsNew(i,j)*sum;
             }
-            for(int k=i+1; k<nParticles; k++){
-                sum -= (r(k,j)-r(i,j))/r_distance(i,k)*JastrowGradientNew(i,k);
+            else{
+                F(i,j) =  2.0*SlaterGradientsNew(i,j);
             }
-            F(i,j) =  2.0*(SlaterGradientsNew(i,j) + sum);
-            JastrowGradientSquared -= 0.5*sum*sum + SlaterGradientsNew(i,j)*sum;
         }
     }
 }

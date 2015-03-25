@@ -42,7 +42,7 @@ private:
     double JastrowFactor();
     double SlaterPsi(const mat &positions, int i, int j);
     void SlaterDeterminant(const mat &positions);
-    double compute_R_sd(int k);
+    double compute_R_sd(int i);
     void SlaterGradient(int i);
     double SlaterLaplacian();
     double Psi_first_derivative(int i, int j, int k);
@@ -103,8 +103,6 @@ private:
     double R_c;
     double R;
     double JastrowGradientSquared;
-    double JastrowOld;
-    double JastrowNew;
     double SlaterLaplacianValue;
 
     mat D_down_old;

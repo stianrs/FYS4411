@@ -9,20 +9,40 @@ in "investigate.cpp" using vmcsolver.cpp.
 #include <iostream>
 #include <armadillo>
 
+#include <mpi.h>
+
+
 
 using namespace std;
 using namespace arma;
 
-int main()
+int main(int argc, char *argv[])
 {
 
     int nCycles = 1000000;
+
+    // Initialize the parallel environment
+    //MPI_Init (&argc, &argv);
+    //MPI_Comm_rank (MPI_COMM_WORLD, &my_rank);
+    //MPI_Comm_size (MPI_COMM_WORLD, &world_size);
 
     VMCSolver *solver = new VMCSolver();
     solver->runMonteCarloIntegration(nCycles);
 
 
-/*
+    MPI_Allreduce(&my_num_rows_B, &max_num_rows_B, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    // Clean up and close the MPI environment
+    //MPI_Finalize ();
+
+
+
+
+
+
+
+
+
+    /*
 
     VMCSolver *investigateAlpha = new VMCSolver();
     investigateAlpha->InvestigateOptimalAlpha();
