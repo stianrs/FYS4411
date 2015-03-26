@@ -13,12 +13,12 @@ class VMCSolver
 public:
     VMCSolver();
 
-    void runMonteCarloIntegration(int nCycles);
-    void MonteCarloIntegration(int nCycles, fstream &outfile);
+    double runMonteCarloIntegration(int nCycles, int my_rank, int world_size);
+    void MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank, int world_size);
     void InvestigateOptimalAlpha();
     void InvestigateOptimalParameters();
     void InvestigateVarianceNcycles();
-    void InvestigateCPUtime();
+    void InvestigateCPUtime(int my_rank, int world_size);
     void InvestigateTimestep();
     void BlockingFunc();
     void OnebodyDensity_ChargeDensity();
@@ -91,8 +91,10 @@ private:
     mat QForceOld;
     mat QForceNew;
     mat r_distance;
+    mat r_distanceOld;
     mat a_matrix;
     vec r_radius;
+    vec r_radiusOld;
 
     vec energy_single;
     vec energySquared_single;
@@ -104,6 +106,8 @@ private:
     double R;
     double JastrowGradientSquared;
     double SlaterLaplacianValue;
+
+    double energy_estimate;
 
     mat D_down_old;
     mat D_down_new;

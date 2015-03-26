@@ -19,10 +19,10 @@ VMCSolver::VMCSolver():
     nDimensions(3),
 
     numerical_energySolver(true), // set true to solve integral numerical
-    activate_JastrowFactor(true), // set true to activate importance sampling
+    activate_JastrowFactor(false), // set true to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
 
-    timestep(0.002), // timestep used in importance sampling
+    timestep(0.0002), // timestep used in importance sampling
     D(0.5), // constant used in importance sampling
 
     h(0.001), // step used in numerical integration
@@ -35,10 +35,12 @@ VMCSolver::VMCSolver():
 }
 
 // function to run MC simualtions from main.cpp
-void VMCSolver::runMonteCarloIntegration(int nCycles)
-{
+double VMCSolver::runMonteCarloIntegration(int nCycles, int my_rank, int world_size)
+{  
     fstream outfile;
-    MonteCarloIntegration(nCycles, outfile);
+    MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
+
+    return energy_estimate;
 }
 
 
@@ -65,8 +67,16 @@ void VMCSolver::SetParametersAtomType(string AtomType){
 
 
 // The Monte Carlo solver both with and without importance sampling
-void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
+void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank, int world_size)
 {
+    nCycles = nCycles/world_size;
+
+    // Start clock to compute spent time for Monte Carlo simulation
+    clock_t start, finish;
+    start = clock();
+
+    //this->idum += my_rank*time(0);
+
     SetParametersAtomType(AtomType);
 
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
@@ -102,8 +112,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     energy_single = zeros<vec>(n);;
     energySquared_single = zeros<vec>(n);
 
-    cout << "With importance sampling" << endl;
-
     double deltaE;
     double energySum = 0;
     double energySquaredSum = 0;
@@ -118,7 +126,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     // initial trial positions
     for(int i = 0; i < nParticles; i++){
         for(int j = 0; j < nDimensions; j++) {
-            rOld(i,j) = GaussianDeviate(&idum)*sqrt(timestep);
+            rOld(i,j) = GaussianDeviate(&idum)*0.5;
         }
     }
     rNew = rOld;
@@ -130,6 +138,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     SlaterDeterminant(rNew);
     D_up_old = D_up_new;
     D_down_old = D_down_new;
+
 
     //SlaterLaplacianValue = SlaterLaplacian();
 
@@ -170,10 +179,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     r_ij_sum += sum(sum(r_distance))/div;
     r_ij_counter += 1;
 
-    // Start clock to compute spent time for Monte Carlo simulation
-    clock_t start, finish;
-    start = clock();
-
     // loop over Monte Carlo cycles
     for(int cycle = 0; cycle < nCycles; cycle++) {
 
@@ -188,17 +193,9 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
             compute_R_sd(i);
 
-            // Recalculate Slater matrices D
-            if(i<nParticles/2){
-                update_D(D_up_new, D_up_old, i, 0);
-            }
-            else{
-                update_D(D_down_new, D_down_old, i, 1);
-            }
-
-
             if (activate_JastrowFactor){
-                update_C(C_new, i);
+                fillJastrowMatrix(C_new);
+                //update_C(C_new, i);????????????
                 computeJastrowGradient(i);
                 computeJastrowLaplacian(i);
                 compute_R_c();
@@ -219,7 +216,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
             // The Metropolis test is performed by moving one particle at the time
             if(ran2(&idum) <= GreensFunction*R*R){
-                for(int j = 0; j < nDimensions; j++) {
+                for(int j = 0; j < nDimensions; j++){
                     rOld(i,j) = rNew(i,j);
                 }
 
@@ -230,12 +227,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
                 JastrowGradientOld = JastrowGradientNew;
                 JastrowLaplacianOld = JastrowLaplacianNew;
 
-                // See later
-                D_up_old = D_up_new;
-                D_down_old = D_down_new;
-
-                /*
-                // NB??????  D_old in Slater laplacian, is this correct? or update
+/*
+                // Recalculate Slater matrices D
                 if(i<nParticles/2){
                     update_D(D_up_new, D_up_old, i, 0);
                 }
@@ -243,6 +236,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
                     update_D(D_down_new, D_down_old, i, 1);
                 }
                 */
+
+                SlaterDeterminant(rNew);
+                D_up_old = D_up_new;
+                D_down_old = D_down_new;
 
                 acceptCounter += 1;
                 counter2 += 1;
@@ -274,6 +271,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
 
             // update energies
             deltaE = localEnergy(rNew);
+            //cout << deltaE << endl;
+            //cout << rNew << endl;
             energySum += deltaE;
             energySquaredSum += deltaE*deltaE;
 
@@ -289,20 +288,22 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile)
     }
 
     double ratioTrial = acceptCounter/counter2;
-    cout << "Acceptance ratio: " << ratioTrial << endl;
+    double energy_mean = energySum/n;
+    double energySquared_mean = energySquaredSum/n;
+
+    energy_estimate = energy_mean;
+    variance = (energySquared_mean - (energy_mean*energy_mean))/n;
+    averange_r_ij = r_ij_sum/r_ij_counter;
 
     // Stop the clock and estimate the spent time
     finish = clock();
     cpu_time = ((finish - start)/((double) CLOCKS_PER_SEC));
 
-    double energy_mean = energySum/n;
-    double energySquared_mean = energySquaredSum/n;
-
-    variance = (energySquared_mean - (energy_mean*energy_mean))/n;
-    averange_r_ij = r_ij_sum/r_ij_counter;
-
+    cout << "With importance sampling, prosessor: "  << my_rank << endl;
+    cout << "Acceptance ratio: " << ratioTrial << endl;
     cout << "Energy: " << energy_mean << " Variance: " << variance <<  " Averange distance r_ij: " << r_ij_sum/r_ij_counter << endl;
     cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << cpu_time << " sec" << endl;
+    cout << endl;
 
 }
 
@@ -526,12 +527,15 @@ double VMCSolver::SlaterLaplacian(){
     double derivative_up = 0.0;
     double derivative_down = 0.0;
 
+    // fix this only on one slater
     for(int i=0; i<nParticles/2; i++){
         for(int j=0; j<nParticles/2; j++){
-            derivative_up += Psi_second_derivative(i, j)*D_up_old(j, i);
-            derivative_down += Psi_second_derivative(i+nParticles/2, j)*D_down_old(j, i);
+            derivative_up += Psi_second_derivative(i, j)*D_up_new(j, i);
+            derivative_down += Psi_second_derivative(i+nParticles/2, j)*D_down_new(j, i);
         }
     }
+    cout << "up: " << derivative_up << endl;
+    cout << "down: " << derivative_down << endl;
     double derivative_sum = derivative_up + derivative_down;
     return derivative_sum;
 }
@@ -631,7 +635,15 @@ void VMCSolver::update_D(mat& D_new, const mat& D_old, int i, int selector){
                 D_new(k,j) = D_old(k,j) - D_old(k, i - nParticles/2*selector)*sum/R_sd;
             }
             else{
-                D_new(k,j) = D_old(k, i - nParticles/2*selector)/R_sd;
+                /*
+                r_func(rOld);
+                double sum = 0;
+                for(int l=0; l<nParticles/2; l++){
+                    sum += SlaterPsi(rOld, i, l)*D_old(l, j);
+                }
+                cout << sum << endl;
+                */
+                D_new(k,j) = D_old(k, i - nParticles/2*selector)/R_sd; // *sum;
             }
         }
     }
@@ -703,21 +715,21 @@ double VMCSolver::psi2s(double &radius){
 // 2px hydrogenic orbital
 double VMCSolver::psi2px(double &x, double &radius){
     double psi2px;
-    psi2px = x*exp(-alpha*radius/2.0);
+    psi2px = alpha*x*exp(-alpha*radius/2.0);
     return psi2px;
 }
 
 // 2py hydrogenic orbital
 double VMCSolver::psi2py(double &y, double &radius){
     double psi2py;
-    psi2py = y*exp(-alpha*radius/2.0);
+    psi2py = alpha*y*exp(-alpha*radius/2.0);
     return psi2py;
 }
 
 // 2pz hydrogenic orbital
 double VMCSolver::psi2pz(double &z, double &radius){
     double psi2pz;
-    psi2pz = z*exp(-alpha*radius/2.0);
+    psi2pz = alpha*z*exp(-alpha*radius/2.0);
     return psi2pz;
 }
 
@@ -777,39 +789,39 @@ double VMCSolver::Psi_first_derivative(int i, int j, int k){
 
     else if(j == 2){
         if(k==0){
-            return -(0.5*alpha*x*x - r)*exp(-0.5*alpha*r)/r;
+            return -alpha*(0.5*alpha*x*x - r)*exp(-0.5*alpha*r)/r;
         }
         else if(k==1){
-            return -0.5*alpha*x*y*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*alpha*x*y*exp(-0.5*alpha*r)/r;
         }
         else{
-            return -0.5*alpha*x*z*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*alpha*x*z*exp(-0.5*alpha*r)/r;
         }
     }
 
 
     else if(j == 3){
         if(k==0){
-            return -0.5*alpha*x*y*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*alpha*x*y*exp(-0.5*alpha*r)/r;
         }
         else if(k==1){
-            return -(0.5*alpha*y*y - r)*exp(-0.5*alpha*r)/r;
+            return -(0.5*alpha*alpha*y*y - r)*exp(-0.5*alpha*r)/r;
         }
         else{
-            return -0.5*alpha*y*z*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*alpha*y*z*exp(-0.5*alpha*r)/r;
         }
     }
 
 
     else if(j == 4){
         if(k==0){
-            return -0.5*alpha*x*z*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*alpha*x*z*exp(-0.5*alpha*r)/r;
         }
         else if(k==1){
-            return -0.5*alpha*y*z*exp(-0.5*alpha*r)/r;
+            return -0.5*alpha*alpha*y*z*exp(-0.5*alpha*r)/r;
         }
         else{
-            return -(0.5*alpha*z*z - r)*exp(-0.5*alpha*r)/r;
+            return -alpha*(0.5*alpha*z*z - r)*exp(-0.5*alpha*r)/r;
         }
     }
     else{
@@ -840,13 +852,13 @@ double VMCSolver::Psi_second_derivative(int i, int j){
         return -0.015625*alpha*(0.125*alpha2*x2 + 0.125*alpha2*y2 + 0.125*alpha2*z2 - 1.25*alpha*r + 2.0)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 2){
-        return 0.0625*alpha2*x*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
+        return alpha*0.0625*alpha2*x*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 3){
-        return 0.0625*alpha2*y*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
+        return alpha*0.0625*alpha2*y*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
     }
     else if(j == 4){
-        return 0.0625*alpha2*z*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
+        return alpha*0.0625*alpha2*z*(0.25*alpha*r - 2.0)*exp(-0.5*alpha*r)/r;
     }
     else{
         return 0;

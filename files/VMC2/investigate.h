@@ -6,7 +6,7 @@ double InvestigateOptimalStep();
 void InvestigateOptimalAlpha();
 void InvestigateOptimalParameters();
 void InvestigateVarianceNcycles();
-void InvestigateCPUtime();
+void InvestigateCPUtime(int my_rank, int world_size);
 void InvestigateTimestep();
 void BlockingFunc();
 void OnebodyDensity_ChargeDensity();

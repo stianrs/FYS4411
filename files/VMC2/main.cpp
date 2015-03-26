@@ -16,24 +16,36 @@ in "investigate.cpp" using vmcsolver.cpp.
 using namespace std;
 using namespace arma;
 
-int main(int argc, char *argv[])
+int main(int nargs, char *args[])
 {
 
-    int nCycles = 1000000;
+    int nCycles = 10;
+
+    int my_rank, world_size;
+    double energy, sum_energy;
 
     // Initialize the parallel environment
-    //MPI_Init (&argc, &argv);
-    //MPI_Comm_rank (MPI_COMM_WORLD, &my_rank);
-    //MPI_Comm_size (MPI_COMM_WORLD, &world_size);
+    MPI_Init (&nargs, &args);
+    MPI_Comm_rank (MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size (MPI_COMM_WORLD, &world_size);
 
     VMCSolver *solver = new VMCSolver();
-    solver->runMonteCarloIntegration(nCycles);
+    energy = solver->runMonteCarloIntegration(nCycles, my_rank, world_size);
+
+    // Collect energy estimates
+    MPI_Reduce(&energy, &sum_energy, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    // Final energy estimate with multiple processors
+    if(my_rank==0){
+        cout << endl << "Ground state estimate: " << sum_energy/world_size << endl;
+    }
 
 
-    MPI_Allreduce(&my_num_rows_B, &max_num_rows_B, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    //VMCSolver *investigateCPU = new VMCSolver();
+    //investigateCPU->InvestigateCPUtime(my_rank, world_size);
+
     // Clean up and close the MPI environment
-    //MPI_Finalize ();
-
+    MPI_Finalize();
 
 
 
