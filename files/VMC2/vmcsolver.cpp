@@ -18,7 +18,8 @@ VMCSolver::VMCSolver():
     AtomType("beryllium"),
     nDimensions(3),
 
-    numerical_energySolver(true), // set true to solve integral numerical
+    energySelector("optimized"),
+    //optimized_energySolver(true), // set true to solve integral numerical
     activate_JastrowFactor(true), // set true to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
 
@@ -120,8 +121,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     int r_ij_counter = 0;
 
     int counter = 0;
-    int counter2 = 0;
     double acceptCounter = 0;
+
 
     // initial trial positions
     for(int i = 0; i < nParticles; i++){
@@ -193,15 +194,11 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
             compute_R_sd(i);
 
             if (activate_JastrowFactor){
-                cout << C_new << endl;
-                fillJastrowMatrix(C_new);
-                cout << C_new << endl;
-                //update_C(C_new, i);????????????
+                update_C(C_new, i);
                 computeJastrowGradient(i);
                 computeJastrowLaplacian(i);
                 compute_R_c(i);
             }
-
 
             QuantumForce(rNew, QForceNew);
 
@@ -239,9 +236,27 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
                     update_D(D_down_new, D_down_old, i, 1);
                     D_down_old = D_down_new;
                 }
-
                 acceptCounter += 1;
-                counter2 += 1;
+
+
+                // compute energies
+                deltaE = localEnergy(rNew);
+                energySum += deltaE;
+                energySquaredSum += deltaE*deltaE;
+
+                energy_single(counter) = deltaE;
+                energySquared_single(counter) = deltaE*deltaE;
+                counter += 1;
+
+                // Compute distance between electrons
+                r_ij_sum += sum(sum(r_distance))/div;
+                r_ij_counter += 1;
+
+                // store all intermediate positions
+                if(save_positions){
+                    save_positions_func(rNew, outfile);
+                }
+
             }
 
             else {
@@ -261,37 +276,16 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
                 D_up_new = D_up_old;
                 D_down_new = D_down_old;
 
-                counter2 += 1;
-            }
-
-            // Compute distance between electrons
-            r_ij_sum += sum(sum(r_distance))/div;
-            r_ij_counter += 1;
-
-            // update energies
-            deltaE = localEnergy(rNew);
-            //cout << deltaE << endl;
-            //cout << rNew << endl;
-            energySum += deltaE;
-            energySquaredSum += deltaE*deltaE;
-
-            energy_single(counter) = deltaE;
-            energySquared_single(counter) = deltaE*deltaE;
-            counter += 1;
-
-            // store all intermediate positions
-            if(save_positions){
-                save_positions_func(rNew, outfile);
             }
         }
     }
 
-    double ratioTrial = acceptCounter/counter2;
-    double energy_mean = energySum/n;
-    double energySquared_mean = energySquaredSum/n;
+    double ratioTrial = acceptCounter/n;
+    double energy_mean = energySum/acceptCounter;
+    double energySquared_mean = energySquaredSum/acceptCounter;
 
     energy_estimate = energy_mean;
-    variance = (energySquared_mean - (energy_mean*energy_mean))/n;
+    variance = (energySquared_mean - (energy_mean*energy_mean))/acceptCounter;
     averange_r_ij = r_ij_sum/r_ij_counter;
 
     // Stop the clock and estimate the spent time
@@ -306,22 +300,13 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
 
 }
 
-double VMCSolver::waveFunction(const mat &r)
-{
-
-}
-
-
 
 // function to compute local energy both numerical and analytical (if expression is found by user)
 double VMCSolver::localEnergy(const mat &r)
 {
 
     // numerical computation of local energy
-    if (numerical_energySolver){
-
-        // Kinetic energy
-        double kineticEnergy = -0.5*SlaterLaplacian();
+    if (energySelector == "optimized"){
 
         // Potential energy
         double potentialEnergy = 0;
@@ -346,9 +331,65 @@ double VMCSolver::localEnergy(const mat &r)
         }
 
         if (activate_JastrowFactor){
-            // Jastrow energy
+            double slaterLaplacianEnergy = SlaterLaplacian();
             double JastrowEnergy = computeJastrowEnergy();
-            return kineticEnergy + potentialEnergy + JastrowEnergy;
+            double kineticEnergy = -0.5*(slaterLaplacianEnergy + JastrowEnergy + energytermJastrow);
+            return kineticEnergy + potentialEnergy;
+        }
+
+        else{
+            double kineticEnergy = -0.5*SlaterLaplacian();
+            return kineticEnergy + potentialEnergy;
+        }
+    }
+
+
+    else if(energySelector == "numerical"){
+        mat rPlus = zeros<mat>(nParticles, nDimensions);
+        mat rMinus = zeros<mat>(nParticles, nDimensions);
+
+        rPlus = rMinus = r;
+
+        double waveFunctionMinus = 0;
+        double waveFunctionPlus = 0;
+
+        double waveFunctionCurrent = waveFunction(r);
+
+        // Kinetic energy
+        double kineticEnergy = 0;
+        for(int i = 0; i < nParticles; i++) {
+            for(int j = 0; j < nDimensions; j++) {
+                rPlus(i,j) += h;
+                rMinus(i,j) -= h;
+                waveFunctionMinus = waveFunction(rMinus);
+                waveFunctionPlus = waveFunction(rPlus);
+                kineticEnergy -= (waveFunctionMinus + waveFunctionPlus - 2 * waveFunctionCurrent);
+                rPlus(i,j) = r(i,j);
+                rMinus(i,j) = r(i,j);
+            }
+        }
+        kineticEnergy = 0.5 * h2 * kineticEnergy / waveFunctionCurrent;
+
+        // Potential energy
+        double potentialEnergy = 0;
+        double rSingleParticle = 0;
+        for(int i = 0; i < nParticles; i++) {
+            rSingleParticle = 0;
+            for(int j = 0; j < nDimensions; j++) {
+                rSingleParticle += r(i,j)*r(i,j);
+            }
+            potentialEnergy -= charge / sqrt(rSingleParticle);
+        }
+
+        // Contribution from electron-electron potential
+        for(int i = 0; i < nParticles; i++) {
+            for(int j = i+1; j < nParticles; j++) {
+                double r_ij = 0;
+                for(int k = 0; k < nDimensions; k++) {
+                    r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
+                }
+                potentialEnergy += 1.0/sqrt(r_ij);
+            }
         }
         return kineticEnergy + potentialEnergy;
     }
@@ -357,7 +398,6 @@ double VMCSolver::localEnergy(const mat &r)
 
     // analytical expressions for local energy
     else {
-
         if (AtomType == "helium"){
             double r1;
             double r2;
@@ -524,20 +564,18 @@ void VMCSolver::SlaterGradient(int i){
 }
 
 
+// WORKING
 // compute slater second derivative
 double VMCSolver::SlaterLaplacian(){
     double derivative_up = 0.0;
     double derivative_down = 0.0;
 
-    // fix this only on one slater
     for(int i=0; i<nParticles/2; i++){
         for(int j=0; j<nParticles/2; j++){
             derivative_up += Psi_second_derivative(i, j)*D_up_new(j, i);
             derivative_down += Psi_second_derivative(i+nParticles/2, j)*D_down_new(j, i);
         }
     }
-    //cout << "up: " << derivative_up << endl;
-    //cout << "down: " << derivative_down << endl;
     double derivative_sum = derivative_up + derivative_down;
     return derivative_sum;
 }
@@ -557,7 +595,7 @@ double VMCSolver::ComputeJastrow(){
 }
 
 
-
+// WORKING
 void VMCSolver::fillJastrowMatrix(mat &CorrelationMatrix){
     for(int k=0; k < nParticles; k++){
         for(int i=k+1; i < nParticles; i++){
@@ -567,7 +605,7 @@ void VMCSolver::fillJastrowMatrix(mat &CorrelationMatrix){
 }
 
 
-
+// WORKING
 void VMCSolver::compute_R_c(int k){
 
     double deltaU = 0.0;
@@ -582,6 +620,7 @@ void VMCSolver::compute_R_c(int k){
 
 
 
+// WORKING
 void VMCSolver::computeJastrowGradient(int k){
     for(int i=0; i<k; i++){
         double divisor = 1.0 + beta*r_distance(i, k);
@@ -594,6 +633,7 @@ void VMCSolver::computeJastrowGradient(int k){
 }
 
 
+// WORKING
 void VMCSolver::computeJastrowLaplacian(int k){
     for(int i=0; i<k; i++){
         double divisor = 1.0 + beta*r_distance(i, k);
@@ -608,18 +648,28 @@ void VMCSolver::computeJastrowLaplacian(int k){
 // OBS! Be sure Quantumforce is called before this function is used!!
 double VMCSolver::computeJastrowEnergy(){
     double sum = 0.0;
+    //cout << JastrowGradientNew << endl;
+    //cout << SlaterGradientsNew << endl;
+    //cout << JastrowGradientNew.col(1) << endl;
+    //cout << SlaterGradientsNew.col(1) << endl;
     for(int k=0; k<nParticles; k++){
+        sum += dot(JastrowGradientNew.col(k), JastrowGradientNew.col(k));
+
         for(int i=0; i<k; i++) {
             sum += (nDimensions - 1)/r_distance(i, k)*JastrowGradientNew(i, k) + JastrowLaplacianNew(i, k);
         }
         for(int i=k+1; i<nParticles; i++) {
             sum += (nDimensions - 1)/r_distance(k, i)*JastrowGradientNew(k, i) + JastrowLaplacianNew(k, i);
         }
+//??????????????????????????????????????++
+        //sum += 2*dot(JastrowGradientNew.col(k), SlaterGradientsNew.col(k));
     }
-    return JastrowGradientSquared - 0.5*sum;
+
+
+
+
+    return sum;
 }
-
-
 
 
 
@@ -646,10 +696,10 @@ void VMCSolver::update_D(mat& D_new, const mat& D_old, int i, int selector){
 
 
 void VMCSolver::update_C(mat &CorrelationsMatrix, int k){
-    for(int i=0; i<k; i++) {
+    for(int i=0; i<k; i++){
         CorrelationsMatrix(i, k) = a_matrix(i,k)*r_distance(i,k)/(1.0 + beta*r_distance(i,k));
     }
-    for(int i=k+1; i<nParticles; i++) {
+    for(int i=k+1; i<nParticles; i++){
         CorrelationsMatrix(k, i) = a_matrix(k,i)*r_distance(k,i)/(1.0 + beta*r_distance(k,i));
     }
 }
@@ -663,7 +713,7 @@ void VMCSolver::update_C(mat &CorrelationsMatrix, int k){
 // compute the quantum force used in importance sampling
 void VMCSolver::QuantumForce(const mat &r, mat &F)
 {
-    JastrowGradientSquared = 0.0;
+    energytermJastrow = 0.0;
     for(int k=0; k<nParticles; k++){
         for(int j=0; j<nDimensions; j++){
 
@@ -676,7 +726,8 @@ void VMCSolver::QuantumForce(const mat &r, mat &F)
                     sum -= (r(i,j)-r(k,j))/r_distance(k,i)*JastrowGradientNew(k,i);
                 }
                 F(k,j) =  2.0*(SlaterGradientsNew(k,j) + sum);
-                JastrowGradientSquared -= 0.5*sum*sum + SlaterGradientsNew(k,j)*sum;
+
+                energytermJastrow -= sum*sum + 2.0*SlaterGradientsNew(k,j)*sum;
             }
             else{
                 F(k,j) =  2.0*SlaterGradientsNew(k,j);
@@ -828,6 +879,122 @@ double VMCSolver::Psi_second_derivative(int i, int j){
 
 
 
+
+
+
+// 1s hydrogenic orbital
+double VMCSolver::psi1s(double &radius){
+    double psi1s;
+    psi1s = exp(-alpha*radius);
+    return psi1s;
+}
+
+// 2s hydrogenic orbital
+double VMCSolver::psi2s(double &radius){
+    double psi2s;
+    psi2s = (1.0 - alpha*radius/2.0)*exp(-alpha*radius/2.0);
+    return psi2s;
+}
+
+// 2px hydrogenic orbital
+double VMCSolver::psi2px(double &x, double &radius){
+    double psi2px;
+    psi2px = alpha*x*exp(-alpha*radius/2.0);
+    return psi2px;
+}
+
+// 2py hydrogenic orbital
+double VMCSolver::psi2py(double &y, double &radius){
+    double psi2py;
+    psi2py = alpha*y*exp(-alpha*radius/2.0);
+    return psi2py;
+}
+
+// 2pz hydrogenic orbital
+double VMCSolver::psi2pz(double &z, double &radius){
+    double psi2pz;
+    psi2pz = alpha*z*exp(-alpha*radius/2.0);
+    return psi2pz;
+}
+
+
+// compute the Slater determinant for Beryllium
+double VMCSolver::SlaterBeryllium(){
+    vec argument = zeros(nParticles);
+    argument = r_radius;
+    // Slater determinant, no factors as they vanish in Metropolis ratio
+    double wf  = (psi1s(argument(0))*psi2s(argument(1))-psi1s(argument(1))*psi2s(argument(0)))*(psi1s(argument(2))*psi2s(argument(3))-psi1s(argument(3))*psi2s(argument(2)));
+    return wf;
+}
+
+
+// compute the Jastrow factor
+double VMCSolver::JastrowMultiplicator(){
+    double Psi = 1.0;
+    for(int j=0; j < nParticles; j++){
+        for(int i=0; i < j; i++){
+            Psi *= exp((a_matrix(i,j)*r_distance(i,j))/(1.0 + beta*r_distance(i,j)));
+        }
+    }
+    return Psi;
+}
+
+
+double VMCSolver::waveFunction(const mat &r)
+{
+    if (AtomType == "helium"){
+        if (activate_JastrowFactor){
+            r_func(r);
+            int div = nParticles*nParticles - nParticles;
+            double r12 = sum(sum(r_distance))/div;
+
+            double argument = 0;
+            for(int i = 0; i < nParticles; i++) {
+                double rSingleParticle = 0;
+                for(int j = 0; j < nDimensions; j++) {
+                    rSingleParticle += r(i,j) * r(i,j);
+                }
+                argument += sqrt(rSingleParticle);
+            }
+            return exp(-argument * alpha)*exp(r12/(2*(1.0 + beta*r12)));
+        }
+
+        else{
+            double argument = 0;
+            for(int i = 0; i < nParticles; i++) {
+                double rSingleParticle = 0;
+                for(int j = 0; j < nDimensions; j++) {
+                    rSingleParticle += r(i,j) * r(i,j);
+                }
+                argument += sqrt(rSingleParticle);
+            }
+            return exp(-argument * alpha);
+        }
+    }
+
+
+    else if (AtomType == "beryllium"){
+        if (activate_JastrowFactor){
+            r_func(r);
+            double factor = JastrowMultiplicator();
+            double hydrogenic = SlaterBeryllium();
+            return hydrogenic*factor;
+        }
+        else{
+            r_func(r);
+            double hydrogenic = SlaterBeryllium();
+            return hydrogenic;
+        }
+    }
+    else{
+        return(0);
+    }
+}
+
+
+
+
+
 /*
 double VMCSolver::SlaterPsi(const mat &positions, int i, int j){
 
@@ -965,6 +1132,120 @@ double VMCSolver::Psi_second_derivative(int i, int j){
         return 0;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// function to compute local energy both numerical and analytical (if expression is found by user)
+double VMCSolver::localEnergy(const mat &r)
+{
+
+    // numerical computation of local energy
+    if (optimized_energySolver){
+
+        // Potential energy
+        double potentialEnergy = 0;
+        double rSingleParticle = 0;
+        for(int i = 0; i < nParticles; i++) {
+            rSingleParticle = 0;
+            for(int j = 0; j < nDimensions; j++) {
+                rSingleParticle += r(i,j)*r(i,j);
+            }
+            potentialEnergy -= charge / sqrt(rSingleParticle);
+        }
+
+        // Contribution from electron-electron potential
+        for(int i = 0; i < nParticles; i++) {
+            for(int j = i+1; j < nParticles; j++) {
+                double r_ij = 0;
+                for(int k = 0; k < nDimensions; k++) {
+                    r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
+                }
+                potentialEnergy += 1.0/sqrt(r_ij);
+            }
+        }
+
+        if (activate_JastrowFactor){
+            double slaterLaplacianEnergy = SlaterLaplacian();
+            double JastrowEnergy = computeJastrowEnergy();
+
+            double kineticEnergy = -0.5*(slaterLaplacianEnergy + JastrowEnergy);
+            return kineticEnergy + potentialEnergy;
+        }
+
+        else{
+            double kineticEnergy = -0.5*SlaterLaplacian();
+            return kineticEnergy + potentialEnergy;
+        }
+    }
+
+
+
+    // analytical expressions for local energy
+    else {
+
+
+
+        if (AtomType == "helium"){
+            double r1;
+            double r2;
+            double r1_sum = 0;
+            double r2_sum = 0;
+            double r1_vec_r2_vec = 0;
+
+            double EL1 = 0;
+            double EL2 = 0;
+            double compact_fraction;
+
+            int div = nParticles*nParticles - nParticles;
+            double r12 = sum(sum(r_distance))/div;
+            for(int i = 0; i < nDimensions; i++){
+                r1_sum += r(0, i)*r(0, i);
+                r2_sum += r(1, i)*r(1, i);
+                r1_vec_r2_vec += r(0, i)*r(1, i);
+            }
+            r1 = sqrt(r1_sum);
+            r2 = sqrt(r2_sum);
+
+            EL1 = (alpha - charge)*((1.0/r1) + (1.0/r2)) + (1.0/r12) - (alpha*alpha);
+
+            if (activate_JastrowFactor){
+                compact_fraction = 1.0/(2*(1.0 + beta*r12)*(1.0 + beta*r12));
+                EL2 = EL1 + compact_fraction*((alpha*(r1 + r2)/r12)*(1.0 - (r1_vec_r2_vec)/(r1*r2)) - compact_fraction - 2.0/r12 + (2.0*beta)/(1.0 + beta*r12));
+                return EL2;
+            }
+
+            else {
+                return EL1;
+            }
+        }
+        else{
+            cout << "You need to implement an analytical expression!" << endl;
+            exit(0);
+        }
+    }
+}
+
 */
 
 

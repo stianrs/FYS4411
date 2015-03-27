@@ -43,6 +43,15 @@ private:
     double Psi_first_derivative(int i, int j, int k);
     double Psi_second_derivative(int i, int j);
 
+    double SlaterBeryllium();
+    double JastrowMultiplicator();
+    double psi1s(double &radius);
+    double psi2s(double &radius);
+    double psi2px(double &x, double &radius);
+    double psi2py(double &y, double &radius);
+    double psi2pz(double &z, double &radius);
+
+
     double ComputeJastrow();
     void fillJastrowMatrix(mat &CorrelationMatrix);
     void compute_R_c(int k);
@@ -58,7 +67,8 @@ private:
 
     int nDimensions;
 
-    bool numerical_energySolver;
+    string energySelector;
+    bool optimized_energySolver;
     bool activate_JastrowFactor;
     bool save_positions;
 
@@ -99,7 +109,7 @@ private:
     double R_sd;
     double R_c;
     double R;
-    double JastrowGradientSquared;
+    double energytermJastrow;
     double SlaterLaplacianValue;
 
     double energy_estimate;

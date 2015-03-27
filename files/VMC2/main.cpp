@@ -19,7 +19,7 @@ using namespace arma;
 int main(int nargs, char *args[])
 {
 
-    int nCycles = 1;
+    int nCycles = 1e6;
 
     int my_rank, world_size;
     double energy, sum_energy;
@@ -37,6 +37,7 @@ int main(int nargs, char *args[])
 
     // Final energy estimate with multiple processors
     if(my_rank==0){
+        cout << "Totalt cycles: " << nCycles << endl;
         cout << endl << "Ground state estimate: " << sum_energy/world_size << endl;
     }
 
