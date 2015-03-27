@@ -32,11 +32,6 @@ private:
     void save_positions_func(const mat &r, fstream &outfile);
     double InvestigateOptimalStep();
     void QuantumForce(const mat &r, mat &F);
-    double psi1s(double &radius);
-    double psi2s(double &radius);
-    double psi2px(double &x, double &radius);
-    double psi2py(double &y, double &radius);
-    double psi2pz(double &z, double &radius);
 
     void fill_a_matrix();
     double JastrowFactor();
@@ -50,7 +45,7 @@ private:
 
     double ComputeJastrow();
     void fillJastrowMatrix(mat &CorrelationMatrix);
-    void compute_R_c();
+    void compute_R_c(int k);
     void computeJastrowGradient(int k);
     void computeJastrowLaplacian(int k);
     double computeJastrowEnergy();

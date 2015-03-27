@@ -19,7 +19,7 @@ VMCSolver::VMCSolver():
     nDimensions(3),
 
     numerical_energySolver(true), // set true to solve integral numerical
-    activate_JastrowFactor(false), // set true to activate importance sampling
+    activate_JastrowFactor(true), // set true to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
 
     timestep(0.0002), // timestep used in importance sampling
@@ -152,7 +152,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     if (activate_JastrowFactor){
         fillJastrowMatrix(C_new);
         C_old = C_new;
-        compute_R_c();
 
         JastrowGradientOld = JastrowGradientNew; // Probably not necessary JastrowGradientOld
         JastrowLaplacianOld = JastrowLaplacianNew;
@@ -194,12 +193,15 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
             compute_R_sd(i);
 
             if (activate_JastrowFactor){
+                cout << C_new << endl;
                 fillJastrowMatrix(C_new);
+                cout << C_new << endl;
                 //update_C(C_new, i);????????????
                 computeJastrowGradient(i);
                 computeJastrowLaplacian(i);
-                compute_R_c();
+                compute_R_c(i);
             }
+
 
             QuantumForce(rNew, QForceNew);
 
@@ -227,19 +229,16 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
                 JastrowGradientOld = JastrowGradientNew;
                 JastrowLaplacianOld = JastrowLaplacianNew;
 
-/*
+
                 // Recalculate Slater matrices D
                 if(i<nParticles/2){
                     update_D(D_up_new, D_up_old, i, 0);
+                    D_up_old = D_up_new;
                 }
                 else{
                     update_D(D_down_new, D_down_old, i, 1);
+                    D_down_old = D_down_new;
                 }
-                */
-
-                SlaterDeterminant(rNew);
-                D_up_old = D_up_new;
-                D_down_old = D_down_new;
 
                 acceptCounter += 1;
                 counter2 += 1;
@@ -401,6 +400,7 @@ double VMCSolver::localEnergy(const mat &r)
 
 
 
+// WORKING
 // compute the distance between all electrons in the atom and the distance from the nucleus
 void VMCSolver::r_func(const mat &positions){
     mat distance = zeros(nParticles, nParticles);
@@ -423,6 +423,7 @@ void VMCSolver::r_func(const mat &positions){
 }
 
 
+// WORKING
 // write positons to file
 void VMCSolver::save_positions_func(const mat &r, fstream &outfile){
     int counter_pos = 0;
@@ -436,6 +437,7 @@ void VMCSolver::save_positions_func(const mat &r, fstream &outfile){
 }
 
 
+// WORKING
 // set up spinns and compute the a-matrix
 void VMCSolver::fill_a_matrix(){
     vec spin = zeros(nParticles);
@@ -460,7 +462,7 @@ void VMCSolver::fill_a_matrix(){
 }
 
 
-
+// WORKING
 // compute the Slater determinant
 void VMCSolver::SlaterDeterminant(const mat &positions){
     mat D_up = zeros(nParticles/2, nParticles/2);
@@ -478,7 +480,7 @@ void VMCSolver::SlaterDeterminant(const mat &positions){
 }
 
 
-
+// WORKING
 // compute the R_sd ratio
 double VMCSolver::compute_R_sd(int i){
     R_sd = 0.0;
@@ -534,8 +536,8 @@ double VMCSolver::SlaterLaplacian(){
             derivative_down += Psi_second_derivative(i+nParticles/2, j)*D_down_new(j, i);
         }
     }
-    cout << "up: " << derivative_up << endl;
-    cout << "down: " << derivative_down << endl;
+    //cout << "up: " << derivative_up << endl;
+    //cout << "down: " << derivative_down << endl;
     double derivative_sum = derivative_up + derivative_down;
     return derivative_sum;
 }
@@ -566,16 +568,14 @@ void VMCSolver::fillJastrowMatrix(mat &CorrelationMatrix){
 
 
 
-void VMCSolver::compute_R_c(){
-    double deltaU = 0.0;
+void VMCSolver::compute_R_c(int k){
 
-    for(int k=0; k < nParticles; k++){
-        for(int i=0; i < k; i++){
-            deltaU += C_new(i, k) - C_old(i, k);
-        }
-        for(int i=k+1; i < nParticles; i++){
-            deltaU += C_new(k, i) - C_old(k, i);
-        }
+    double deltaU = 0.0;
+    for(int i=0; i < k; i++){
+        deltaU += C_new(i, k) - C_old(i, k);
+    }
+    for(int i=k+1; i<nParticles; i++){
+        deltaU += C_new(k, i) - C_old(k, i);
     }
     R_c = exp(deltaU);
 }
@@ -583,11 +583,11 @@ void VMCSolver::compute_R_c(){
 
 
 void VMCSolver::computeJastrowGradient(int k){
-    for(int i=0; i < k; i++){
+    for(int i=0; i<k; i++){
         double divisor = 1.0 + beta*r_distance(i, k);
         JastrowGradientNew(i, k) = a_matrix(i, k)/(divisor*divisor);
     }
-    for(int i=k+1; i < nParticles; i++){
+    for(int i=k+1; i<nParticles; i++){
         double divisor = 1.0 + beta*r_distance(k, i);
         JastrowGradientNew(k, i) = a_matrix(k, i)/(divisor*divisor);
     }
@@ -623,27 +623,21 @@ double VMCSolver::computeJastrowEnergy(){
 
 
 
-
+// WORKING
 void VMCSolver::update_D(mat& D_new, const mat& D_old, int i, int selector){
+    i = i - nParticles/2*selector;
+
     for(int k=0; k<nParticles/2; k++){
         for(int j=0; j<nParticles/2; j++){
             if(j!=i){
                 double sum = 0;
                 for(int l=0; l<nParticles/2; l++){
-                    sum += SlaterPsi(rNew, i, l)*D_old(l,j);
+                    sum += SlaterPsi(rNew, i + nParticles/2*selector, l)*D_old(l,j);
                 }
-                D_new(k,j) = D_old(k,j) - D_old(k, i - nParticles/2*selector)*sum/R_sd;
+                D_new(k,j) = D_old(k,j) - D_old(k, i)*sum/R_sd;
             }
             else{
-                /*
-                r_func(rOld);
-                double sum = 0;
-                for(int l=0; l<nParticles/2; l++){
-                    sum += SlaterPsi(rOld, i, l)*D_old(l, j);
-                }
-                cout << sum << endl;
-                */
-                D_new(k,j) = D_old(k, i - nParticles/2*selector)/R_sd; // *sum;
+                D_new(k,j) = D_old(k, i)/R_sd;
             }
         }
     }
@@ -670,22 +664,22 @@ void VMCSolver::update_C(mat &CorrelationsMatrix, int k){
 void VMCSolver::QuantumForce(const mat &r, mat &F)
 {
     JastrowGradientSquared = 0.0;
-    for(int i=0; i<nParticles; i++){
+    for(int k=0; k<nParticles; k++){
         for(int j=0; j<nDimensions; j++){
 
             if(activate_JastrowFactor){
                 double sum = 0.0;
-                for(int k=0; k<i; k++){
-                    sum += (r(i,j)-r(k,j))/r_distance(k,i)*JastrowGradientNew(k,i);
+                for(int i=0; i<k; i++){
+                    sum += (r(k,j)-r(i,j))/r_distance(i,k)*JastrowGradientNew(i,k);
                 }
-                for(int k=i+1; k<nParticles; k++){
-                    sum -= (r(k,j)-r(i,j))/r_distance(i,k)*JastrowGradientNew(i,k);
+                for(int i=k+1; i<nParticles; i++){
+                    sum -= (r(i,j)-r(k,j))/r_distance(k,i)*JastrowGradientNew(k,i);
                 }
-                F(i,j) =  2.0*(SlaterGradientsNew(i,j) + sum);
-                JastrowGradientSquared -= 0.5*sum*sum + SlaterGradientsNew(i,j)*sum;
+                F(k,j) =  2.0*(SlaterGradientsNew(k,j) + sum);
+                JastrowGradientSquared -= 0.5*sum*sum + SlaterGradientsNew(k,j)*sum;
             }
             else{
-                F(i,j) =  2.0*SlaterGradientsNew(i,j);
+                F(k,j) =  2.0*SlaterGradientsNew(k,j);
             }
         }
     }
@@ -694,46 +688,147 @@ void VMCSolver::QuantumForce(const mat &r, mat &F)
 
 
 
+// WORKING
+double VMCSolver::SlaterPsi(const mat &positions, int i, int j){
 
+    double r;
+    double x, y, z;
 
+    r = r_radius(i);
 
-
-// 1s hydrogenic orbital
-double VMCSolver::psi1s(double &radius){
-    double psi1s;
-    psi1s = exp(-alpha*radius);
-    return psi1s;
+    if(j == 0){
+        // 1s hydrogenic orbital
+        return exp(-alpha*r);
+    }
+    else if(j == 1){
+        // 2s hydrogenic orbital
+        double arg = alpha*r*0.5;
+        return (1.0 - arg)*exp(-arg);
+    }
+    else if(j == 2){
+        // 2px hydrogenic orbital
+        x = positions(i, 0);
+        return x*exp(-alpha*r*0.5);
+    }
+    else if(j == 3){
+        // 2py hydrogenic orbital
+        y = positions(i, 1);
+        return y*exp(-alpha*r*0.5);
+    }
+    else if(j == 4){
+        // 2px hydrogenic orbital
+        z = positions(i, 2);
+        return z*exp(-alpha*r*0.5);
+    }
+    else{
+        return 0;
+    }
 }
 
-// 2s hydrogenic orbital
-double VMCSolver::psi2s(double &radius){
-    double psi2s;
-    psi2s = (1.0 - alpha*radius/2.0)*exp(-alpha*radius/2.0);
-    return psi2s;
+
+// WORKING
+// Gradient of orbitals used in quantum force
+double VMCSolver::Psi_first_derivative(int i, int j, int k){
+    double r, coor;
+    double x, y, z;
+
+    r = r_radius(i);
+    coor = rNew(i, k);
+
+    x = rNew(i, 0);
+    y = rNew(i, 1);
+    z = rNew(i, 2);
+
+    if(j == 0){
+        return -alpha*coor*exp(-alpha*r)/r;
+    }
+    else if(j == 1){
+        return 0.25*alpha*coor*(alpha*r - 4.0)*exp(-alpha*r*0.5)/r;
+    }
+
+    else if(j == 2){
+        if(k==0){
+            return -(0.5*alpha*x*x - r)*exp(-alpha*r*0.5)/r;
+        }
+        else if(k==1){
+            return -0.5*alpha*x*y*exp(-alpha*r*0.5)/r;
+        }
+        else{
+            return -0.5*alpha*x*z*exp(-alpha*r*0.5)/r;
+        }
+    }
+
+    else if(j == 3){
+        if(k==0){
+            return -0.5*alpha*x*y*exp(-alpha*r*0.5)/r;
+        }
+        else if(k==1){
+            return -(0.5*alpha*y*y - r)*exp(-alpha*r*0.5)/r;
+        }
+        else{
+            return -0.5*alpha*y*z*exp(-alpha*r*0.5)/r;
+        }
+    }
+
+    else if(j == 4){
+        if(k==0){
+            return -0.5*alpha*x*z*exp(-alpha*r*0.5)/r;
+        }
+        else if(k==1){
+            return -0.5*alpha*y*z*exp(-alpha*r*0.5)/r;
+        }
+        else{
+            return -(0.5*alpha*z*z - r)*exp(-alpha*r*0.5)/r;
+        }
+    }
+    else{
+        return 0;
+    }
 }
 
-// 2px hydrogenic orbital
-double VMCSolver::psi2px(double &x, double &radius){
-    double psi2px;
-    psi2px = alpha*x*exp(-alpha*radius/2.0);
-    return psi2px;
+
+// WORKING
+// Laplacian of orbitals used in kinetic energy
+double VMCSolver::Psi_second_derivative(int i, int j){
+    double r;
+    double x, y, z;
+
+    r = r_radius(i);
+    x = rNew(i, 0);
+    y = rNew(i, 1);
+    z = rNew(i, 2);
+
+    double r2 = r*r;
+    double alpha2 = alpha*alpha;
+
+    if(j == 0){
+        return alpha*(alpha*r - 2)*exp(-alpha*r)/r;
+    }
+    else if(j == 1){
+        return -0.125*alpha*(alpha2*r2 - 10.0*alpha*r + 16.0)*exp(-alpha*r*0.5)/r;
+    }
+    else if(j == 2){
+        return 0.25*alpha*x*(alpha*r - 8.0)*exp(-alpha*r*0.5)/r;
+    }
+    else if(j == 3){
+        return 0.25*alpha*y*(alpha*r - 8.0)*exp(-alpha*r*0.5)/r;
+    }
+    else if(j == 4){
+        return 0.25*alpha*z*(alpha*r - 8.0)*exp(-alpha*r*0.5)/r;
+    }
+    else{
+        return 0;
+    }
 }
 
-// 2py hydrogenic orbital
-double VMCSolver::psi2py(double &y, double &radius){
-    double psi2py;
-    psi2py = alpha*y*exp(-alpha*radius/2.0);
-    return psi2py;
-}
-
-// 2pz hydrogenic orbital
-double VMCSolver::psi2pz(double &z, double &radius){
-    double psi2pz;
-    psi2pz = alpha*z*exp(-alpha*radius/2.0);
-    return psi2pz;
-}
 
 
+
+
+
+
+
+/*
 double VMCSolver::SlaterPsi(const mat &positions, int i, int j){
 
     double radius;
@@ -742,22 +837,28 @@ double VMCSolver::SlaterPsi(const mat &positions, int i, int j){
     radius = r_radius(i);
 
     if(j == 0){
-        return psi1s(radius);
+        // 1s hydrogenic orbital
+        return exp(-alpha*radius);
     }
     else if(j == 1){
-        return psi2s(radius);
+        // 2s hydrogenic orbital
+        double arg = alpha*radius*0.5;
+        return (1.0 - arg)*exp(-arg);
     }
     else if(j == 2){
+        // 2px hydrogenic orbital
         x = positions(i, 0);
-        return psi2px(x, radius);
+        return alpha*x*exp(-alpha*radius/2.0);
     }
     else if(j == 3){
+        // 2py hydrogenic orbital
         y = positions(i, 1);
-        return psi2py(y, radius);
+        return alpha*y*exp(-alpha*radius/2.0);
     }
     else if(j == 4){
+        // 2px hydrogenic orbital
         z = positions(i, 2);
-        return psi2pz(z, radius);
+        return alpha*z*exp(-alpha*radius/2.0);
     }
     else{
         return 0;
@@ -864,6 +965,14 @@ double VMCSolver::Psi_second_derivative(int i, int j){
         return 0;
     }
 }
+*/
+
+
+
+
+
+
+
 
 
 

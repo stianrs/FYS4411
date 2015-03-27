@@ -19,7 +19,7 @@ using namespace arma;
 int main(int nargs, char *args[])
 {
 
-    int nCycles = 10;
+    int nCycles = 1;
 
     int my_rank, world_size;
     double energy, sum_energy;
