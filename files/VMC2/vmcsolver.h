@@ -119,7 +119,7 @@ private:
     mat D_up_old;
     mat D_up_new;
     mat SlaterGradientsOld;
-    mat SlaterGradientsNew;
+    mat SlaterGradientNew;
 
     mat C_old;
     mat C_new;
