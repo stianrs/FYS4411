@@ -109,7 +109,7 @@ private:
     double R_sd;
     double R_c;
     double R;
-    double energytermJastrow;
+    double energytermSlaterJastrow;
     double SlaterLaplacianValue;
 
     double energy_estimate;

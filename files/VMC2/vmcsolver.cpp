@@ -333,7 +333,7 @@ double VMCSolver::localEnergy(const mat &r)
         if (activate_JastrowFactor){
             double slaterLaplacianEnergy = SlaterLaplacian();
             double JastrowEnergy = computeJastrowEnergy();
-            double kineticEnergy = -0.5*(slaterLaplacianEnergy + JastrowEnergy + 2.0*energytermJastrow);
+            double kineticEnergy = -0.5*(slaterLaplacianEnergy + JastrowEnergy + 2.0*energytermSlaterJastrow);
             return kineticEnergy + potentialEnergy;
         }
 
@@ -709,21 +709,21 @@ void VMCSolver::update_C(mat &CorrelationsMatrix, int k){
 // compute the quantum force used in importance sampling
 void VMCSolver::QuantumForce(const mat &r, mat &F)
 {
-    energytermJastrow = 0.0;
+    energytermSlaterJastrow = 0.0;
     for(int k=0; k<nParticles; k++){
         for(int j=0; j<nDimensions; j++){
 
             if(activate_JastrowFactor){
-                double sum = 0.0;
+                double GradientSum = 0.0;
                 for(int i=0; i<k; i++){
-                    sum += (r(k,j)-r(i,j))/r_distance(i,k)*JastrowGradientNew(i,k);
+                    GradientSum += (r(k,j)-r(i,j))/r_distance(i,k)*JastrowGradientNew(i,k);
                 }
                 for(int i=k+1; i<nParticles; i++){
-                    sum -= (r(i,j)-r(k,j))/r_distance(k,i)*JastrowGradientNew(k,i);
+                    GradientSum -= (r(i,j)-r(k,j))/r_distance(k,i)*JastrowGradientNew(k,i);
                 }
-                F(k,j) =  2.0*(SlaterGradientNew(k,j) + sum);
+                F(k,j) =  2.0*(SlaterGradientNew(k,j) + GradientSum);
 // ?????????????????????? Is this correct?
-                energytermJastrow += sum*sum + 2.0*SlaterGradientNew(k,j)*sum;
+                energytermSlaterJastrow += SlaterGradientNew(k,j)*GradientSum;
             }
             else{
                 F(k,j) =  2.0*SlaterGradientNew(k,j);
