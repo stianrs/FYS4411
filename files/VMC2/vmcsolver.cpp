@@ -15,12 +15,12 @@ using namespace arma;
 using namespace std;
 
 VMCSolver::VMCSolver():
-    AtomType("helium"),
+    AtomType("neon"),
     nDimensions(3),
 
     energySelector("optimized"),
     //optimized_energySolver(true), // set true to solve integral numerical
-    activate_JastrowFactor(true), // set true to activate importance sampling
+    activate_JastrowFactor(false), // set true to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
 
     timestep(0.0002), // timestep used in importance sampling
@@ -28,8 +28,8 @@ VMCSolver::VMCSolver():
 
     h(0.001), // step used in numerical integration
     h2(1000000), // 1/h^2 used in numerical integration
-    //idum(time(0)) // random number generator, seed=time(0) for random seed
-    idum(-1)
+    idum(time(0)) // random number generator, seed=time(0) for random seed
+    //idum(-1)
 {    
     r_distance = zeros(nParticles, nParticles); // distance between electrons
     r_radius = zeros(nParticles); // distance between nucleus and electrons

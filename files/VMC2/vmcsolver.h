@@ -16,12 +16,12 @@ public:
     double runMonteCarloIntegration(int nCycles, int my_rank, int world_size);
     void MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank, int world_size);
     void InvestigateOptimalAlpha();
-    void InvestigateOptimalParameters();
+    void InvestigateOptimalParameters(int my_rank, int world_size);
     void InvestigateVarianceNcycles();
     void InvestigateCPUtime(int my_rank, int world_size);
     void InvestigateTimestep();
-    void BlockingFunc();
-    void OnebodyDensity_ChargeDensity();
+    void BlockingFunc(int my_rank, int world_size);
+    void OnebodyDensity_ChargeDensity(int my_rank, int world_size);
 
 
 private:
