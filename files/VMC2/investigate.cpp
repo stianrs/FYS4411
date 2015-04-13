@@ -53,14 +53,14 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
     QForceOld = zeros<mat>(nParticles, nDimensions);
     QForceNew = zeros<mat>(nParticles, nDimensions);
 
-    SlaterGradientsOld = zeros<mat>(nParticles, nDimensions);
+    SlaterGradientOld = zeros<mat>(nParticles, nDimensions);
     SlaterGradientNew = zeros<mat>(nParticles, nDimensions);
 
     C_old = zeros<mat>(nParticles, nParticles);
     C_new = zeros<mat>(nParticles, nParticles);
 
-    JastrowGradientNew = zeros<mat>(nParticles, nParticles);
-    JastrowGradientOld = zeros<mat>(nParticles, nParticles);
+    JastrowDerivative = zeros<mat>(nParticles, nParticles);
+    JastrowDerivativeOld = zeros<mat>(nParticles, nParticles);
     JastrowLaplacianNew = zeros<mat>(nParticles, nParticles);
     JastrowLaplacianOld = zeros<mat>(nParticles, nParticles);
 
@@ -144,7 +144,7 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
             for(int i=0; i<nParticles; i++){
                 SlaterGradient(i);
             }
-            SlaterGradientsOld = SlaterGradientNew;
+            SlaterGradientOld = SlaterGradientNew;
 
             // Compute everything about Jastrowfactor
             R_c = 1.0;
@@ -152,14 +152,14 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
                 fillJastrowMatrix(C_new);
                 C_old = C_new;
 
-                JastrowGradientOld = JastrowGradientNew; // Probably not necessary JastrowGradientOld
+                JastrowDerivativeOld = JastrowDerivative; // Probably not necessary JastrowGradientOld
                 JastrowLaplacianOld = JastrowLaplacianNew;
 
                 for(int i=0; i<nParticles; i++){
-                    computeJastrowGradient(i);
+                    computeJastrowDerivative(i);
                     computeJastrowLaplacian(i);
                 }
-                JastrowGradientOld = JastrowGradientNew;
+                JastrowDerivativeOld = JastrowDerivative;
                 JastrowLaplacianOld = JastrowLaplacianNew;
             }
 
@@ -169,7 +169,7 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
 
             acceptCounter = 0;
 
-            /// loop over Monte Carlo cycles
+            // loop over Monte Carlo cycles
             for(int cycle = 0; cycle < nCycles; cycle++) {
 
                 // New position to test
@@ -185,7 +185,7 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
 
                     if (activate_JastrowFactor){
                         update_C(C_new, i);
-                        computeJastrowGradient(i);
+                        computeJastrowDerivative(i);
                         computeJastrowLaplacian(i);
                         compute_R_c(i);
                     }
@@ -212,8 +212,8 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
                         QForceOld = QForceNew;
                         C_old = C_new;
 
-                        SlaterGradientsOld = SlaterGradientNew; // SlaterGradientsOld probably totally unesscesary
-                        JastrowGradientOld = JastrowGradientNew;
+                        SlaterGradientOld = SlaterGradientNew; // SlaterGradientsOld probably totally unesscesary
+                        JastrowDerivativeOld = JastrowDerivative;
                         JastrowLaplacianOld = JastrowLaplacianNew;
 
 
@@ -244,8 +244,8 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
                         QForceNew = QForceOld;
                         C_new = C_old;
 
-                        SlaterGradientNew = SlaterGradientsOld; // SlaterGradientsOld probably totally unesscesary
-                        JastrowGradientNew = JastrowGradientOld;
+                        SlaterGradientNew = SlaterGradientOld; // SlaterGradientsOld probably totally unesscesary
+                        JastrowDerivative = JastrowDerivativeOld;
                         JastrowLaplacianNew = JastrowLaplacianOld;
 
                         D_up_new = D_up_old;
@@ -307,9 +307,9 @@ void VMCSolver::InvestigateVarianceNcycles(){
 void VMCSolver::InvestigateCPUtime(int my_rank, int world_size){
 
     fstream outfile;
-    outfile.open("cpu_time_MPI_1.dat", ios::out);
+    outfile.open("cpu_time_MPI_2_new.dat", ios::out);
 
-    int nSimulations = 30;
+    int nSimulations = 20;
     int nCycles; // ????  ask for help
     double t_start = 0.0;
     double t_stop = 0.0;
@@ -368,7 +368,7 @@ void VMCSolver::InvestigateTimestep(){
 // function that run a MC simulation, compute and store all intermediate energy, and write the energy to file
 void VMCSolver::BlockingFunc(int my_rank, int world_size){
 
-    int nCycles = 1000000;
+    int nCycles = 10000000;
 
     fstream outfile;
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
@@ -385,10 +385,10 @@ void VMCSolver::BlockingFunc(int my_rank, int world_size){
 // function that run a MC simulation, storing all intermediate positions for all electrons, and write the postions to file
 void VMCSolver::OnebodyDensity_ChargeDensity(int my_rank, int world_size){
 
-    nCycles = 50000;
+    nCycles = 1000000;
 
     fstream outfile;
-    outfile.open("OnebodyDensity_ChargeDensity_xxx.dat", ios::out);
+    outfile.open("OnebodyDensity_ChargeDensity_helium_new.dat", ios::out);
     save_positions = true;
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
     outfile.close();

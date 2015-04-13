@@ -37,7 +37,7 @@ private:
     double JastrowFactor();
     double SlaterPsi(const mat &positions, int i, int j);
     void SlaterDeterminant(const mat &positions);
-    double compute_R_sd(int i);
+    void compute_R_sd(int i);
     void SlaterGradient(int i);
     double SlaterLaplacian();
     double Psi_first_derivative(int i, int j, int k);
@@ -55,7 +55,7 @@ private:
     double ComputeJastrow();
     void fillJastrowMatrix(mat &CorrelationMatrix);
     void compute_R_c(int k);
-    void computeJastrowGradient(int k);
+    void computeJastrowDerivative(int k);
     void computeJastrowLaplacian(int k);
     double computeJastrowEnergy();
 
@@ -111,6 +111,7 @@ private:
     double R;
     double energytermSlaterJastrow;
     double SlaterLaplacianValue;
+    double GradientSquared;
 
     double energy_estimate;
 
@@ -118,15 +119,18 @@ private:
     mat D_down_new;
     mat D_up_old;
     mat D_up_new;
-    mat SlaterGradientsOld;
+    mat SlaterGradientOld;
     mat SlaterGradientNew;
 
     mat C_old;
     mat C_new;
-    mat JastrowGradientNew;
-    mat JastrowGradientOld;
+    mat JastrowDerivative;
+    mat JastrowDerivativeOld;
+    mat JastrowGradient;
     mat JastrowLaplacianNew;
     mat JastrowLaplacianOld;
+    double JastrowEnergySum;
+    double CrosstermSum;
 
 };
 
