@@ -15,8 +15,8 @@ using namespace arma;
 using namespace std;
 
 VMCSolver::VMCSolver():
-    AtomType("beryllium"),
-    nDimensions(3),
+    AtomType("helium"),
+    nDimensions(2),
     
     energySelector("optimized"),
     activate_JastrowFactor(true), // set true to activate importance sampling
