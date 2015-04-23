@@ -10,12 +10,13 @@ This is the program with the MC solver both with and without importrance samplin
 #include <iostream>
 #include <time.h>
 #include <fstream>
+#include <iomanip>
 
 using namespace arma;
 using namespace std;
 
 VMCSolver::VMCSolver():
-    AtomType("beryllium"),
+    AtomType("helium"),
     nDimensions(3),
     
     energySelector("optimized"),
@@ -38,6 +39,7 @@ VMCSolver::VMCSolver():
 double VMCSolver::runMonteCarloIntegration(int nCycles, int my_rank, int world_size)
 {
     fstream outfile;
+    findOptimalBeta(my_rank, world_size);
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
     
     return energy_estimate;
@@ -49,19 +51,19 @@ void VMCSolver::SetParametersAtomType(string AtomType){
         charge = 2;
         nParticles = 2;
         alpha = 1.85;
-        beta = 0.35;
+        //beta = 0.35;
     }
     else if(AtomType == "beryllium"){
         charge = 4;
         nParticles = 4;
         alpha = 3.9;
-        beta = 0.1;
+        //beta = 0.1;
     }
     else if(AtomType == "neon"){
         charge = 10;
         nParticles = 10;
         alpha = 10.2;
-        beta = 0.09;
+        //beta = 0.09;
     }
 }
 
@@ -250,6 +252,12 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
                 energySum += deltaE;
                 energySquaredSum += deltaE*deltaE;
 
+                betaE = beta_derivative_Jastrow();
+
+                betaDerivativeSum += betaE;
+                energyBetaDerivativeSum += deltaE*betaE;
+
+
                 energy_single(counter) = deltaE;
                 energySquared_single(counter) = deltaE*deltaE;
                 counter += 1;
@@ -299,7 +307,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     double betaDerivative_mean = betaDerivativeSum/n;
     double energyBetaDerivative_mean = energyBetaDerivativeSum/n;
 
-    double E_betaDerivative = 2*(energyBetaDerivative_mean - energy_mean*betaDerivative_mean);
+    E_betaDerivative = 2*(energyBetaDerivative_mean - energy_mean*betaDerivative_mean);
 
     energy_estimate = energy_mean;
     variance = (energySquared_mean - (energy_mean*energy_mean))/n;
@@ -309,9 +317,9 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     finish = clock();
     cpu_time = ((finish - start)/((double) CLOCKS_PER_SEC));
 
-    cout << "With importance sampling, prosessor: "  << my_rank << endl;
-    cout << "Acceptance ratio: " << ratioTrial << endl;
-    cout << "Energy: " << energy_mean << " Variance: " << variance <<  " Averange distance r_ij: " << r_ij_sum/r_ij_counter << endl;
+    cout << "With importance sampling, processor: "  << my_rank << endl;
+    cout << "Acceptance ratio: " << ratioTrial << "   beta: " << beta << endl;
+    cout << "Energy: " << energy_mean << "   Variance: " << variance <<  "   Averange distance r_ij: " << r_ij_sum/r_ij_counter << endl;
     cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << cpu_time << " sec" << endl;
     cout << endl;
 }
@@ -727,16 +735,49 @@ void VMCSolver::QuantumForce(const mat &r, mat &F){
 }
 
 
-double beta_derivative_Jastrow(){
+
+double VMCSolver::beta_derivative_Jastrow(){
     double derivative_sum = 0.0;
     for(int j=0; j<nParticles; j++){
         for(int i=0; i<j; i++){
-            double divisor = (1.0 - beta*r_distance(i,j));
-            derivative_sum += (a_matrix(i,j)*r_distance(i,j)*r_distance(i,j))/(divisor*divisor);
+            double divisor = (1.0 + beta*r_distance(i,j));
+            derivative_sum += (-a_matrix(i,j)*r_distance(i,j)*r_distance(i,j))/(divisor*divisor);
         }
     }
     return derivative_sum;
 }
+
+
+
+double VMCSolver::findOptimalBeta(int my_rank, int world_size){
+    int nCycles = 10000;
+    int max_iter = 30;
+    double step = 0.1;
+    const double precision = 1.0e-4;
+
+    beta = 0.34;
+    double beta_new = beta;
+    double beta_old = 0.0;
+
+    fstream outfile;
+    int counter = 0;
+    while(abs(beta_new - beta_old) > precision) {
+        MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
+        beta_old = beta_new;
+        beta_new = beta_old - step*E_betaDerivative;
+
+        beta = beta_new;
+        counter++;
+        if(counter > max_iter){
+            cout << "Max iter reached when finding beta!" << endl;
+            cout << "beta: " << beta_new << endl;
+            break;
+        }
+    }
+    cout << endl << endl << endl;
+}
+
+
 
 
 double VMCSolver::SlaterPsi(const mat &positions, int i, int j){

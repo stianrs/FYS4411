@@ -59,6 +59,9 @@ private:
     void computeJastrowLaplacian(int k);
     double computeJastrowEnergy();
 
+    double beta_derivative_Jastrow();
+    double findOptimalBeta(int my_rank, int world_size);
+
     void update_D(mat& D_new, const mat& D_old, int i, int selector);
     void update_C(mat &CorrelationsMatrix, int k);
 
@@ -114,6 +117,7 @@ private:
     double GradientSquared;
 
     double energy_estimate;
+    double E_betaDerivative;
 
     mat D_down_old;
     mat D_down_new;
