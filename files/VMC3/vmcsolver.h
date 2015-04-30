@@ -60,7 +60,8 @@ private:
     double computeJastrowEnergy();
 
     double beta_derivative_Jastrow();
-    double findOptimalBeta(int my_rank, int world_size);
+    void findOptimalBeta(int my_rank, int world_size);
+    void GaussianOrbitals(int i, int j, int k, double GTO);
 
     void update_D(mat& D_new, const mat& D_old, int i, int selector);
     void update_C(mat &CorrelationsMatrix, int k);

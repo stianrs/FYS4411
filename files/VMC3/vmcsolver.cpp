@@ -39,7 +39,7 @@ VMCSolver::VMCSolver():
 double VMCSolver::runMonteCarloIntegration(int nCycles, int my_rank, int world_size)
 {
     fstream outfile;
-    findOptimalBeta(my_rank, world_size);
+    //findOptimalBeta(my_rank, world_size);
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
     
     return energy_estimate;
@@ -51,19 +51,19 @@ void VMCSolver::SetParametersAtomType(string AtomType){
         charge = 2;
         nParticles = 2;
         alpha = 1.85;
-        //beta = 0.35;
+        beta = 0.35;
     }
     else if(AtomType == "beryllium"){
         charge = 4;
         nParticles = 4;
         alpha = 3.9;
-        //beta = 0.1;
+        beta = 0.1;
     }
     else if(AtomType == "neon"){
         charge = 10;
         nParticles = 10;
         alpha = 10.2;
-        //beta = 0.09;
+        beta = 0.09;
     }
 }
 
@@ -71,6 +71,18 @@ void VMCSolver::SetParametersAtomType(string AtomType){
 // The Monte Carlo solver both with and without importance sampling
 void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank, int world_size)
 {
+
+    // +++++ Make read files as a function!!!
+    string line;
+
+    ifstream GTO_helium("GTO_helium.dat");
+    ifstream GTO_beryllium("GTO_beryllium.dat");
+    ifstream GTO_neon("GTO_neon.dat");
+
+    cout << GTO_helium << endl;
+
+
+
     // workload for different processors
     nCycles = nCycles/world_size;
     
@@ -749,7 +761,7 @@ double VMCSolver::beta_derivative_Jastrow(){
 
 
 
-double VMCSolver::findOptimalBeta(int my_rank, int world_size){
+void VMCSolver::findOptimalBeta(int my_rank, int world_size){
     int nCycles = 10000;
     int max_iter = 30;
     double step = 0.1;
@@ -776,6 +788,25 @@ double VMCSolver::findOptimalBeta(int my_rank, int world_size){
     }
     cout << endl << endl << endl;
 }
+
+
+// !!!!!!! Check definision in header
+void VMCSolver::GaussianOrbitals(int i, int j, int k, double GTO){
+
+    double r;
+    double x, y, z;
+
+    r = r_radius(i);
+
+    x = rNew(i, 0);
+    y = rNew(i, 1);
+    z = rNew(i, 2);
+
+
+
+    //return N*pow(x, i)*pow(y, j)*pow(z, k)*exp(-GTO*r*r);
+}
+
 
 
 
