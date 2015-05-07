@@ -14,6 +14,7 @@ This is the program with the MC solver both with and without importrance samplin
 
 using namespace arma;
 using namespace std;
+const double pi = 4*atan(1.0);
 
 VMCSolver::VMCSolver():
     AtomType("helium"),
@@ -71,18 +72,6 @@ void VMCSolver::SetParametersAtomType(string AtomType){
 // The Monte Carlo solver both with and without importance sampling
 void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank, int world_size)
 {
-
-    // +++++ Make read files as a function!!!
-    string line;
-
-    ifstream GTO_helium("GTO_helium.dat");
-    ifstream GTO_beryllium("GTO_beryllium.dat");
-    ifstream GTO_neon("GTO_neon.dat");
-
-    cout << GTO_helium << endl;
-
-
-
     // workload for different processors
     nCycles = nCycles/world_size;
     
@@ -97,7 +86,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
-    
+
+    // fill GTO_matrices for Helium, Beryllium and Neon with 3-21G basis set
+    fillAllGTOs();
+
     int n = nCycles*nParticles;
     
     rOld = zeros<mat>(nParticles, nDimensions);
@@ -153,9 +145,14 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
         }
     }
     rNew = rOld;
-    
+
     // Calculate r_distance and r_radius
     r_func(rNew);
+
+    // !!!!!!!!!!!!!!!!!!! Remove this
+    double psi_val = GaussianOrbitals(GTO_neon, 0, 0, 0, 0);
+    cout << psi_val << endl;
+
     
     R_sd = 1.0;
 
@@ -789,22 +786,145 @@ void VMCSolver::findOptimalBeta(int my_rank, int world_size){
     cout << endl << endl << endl;
 }
 
+// Reads a file and store values in a matrix
+void VMCSolver::ReadFile_fillGTO(mat &GTO_mat, string filename){
+    int num_rows = GTO_mat.n_rows;
+    double GTO_alpha, GTO_c1, GTO_c2;
+    mat GTO_values = zeros(num_rows, 3);
+    ifstream myfile;
+
+    myfile.open(filename.c_str(), ios::in);
+    if(!myfile){
+        cout << "Not able to open file!" << endl;
+        exit(1);
+    }
+    int k = 0;
+    while(k<num_rows){
+        myfile >> GTO_alpha >> GTO_c1 >> GTO_c2;
+        GTO_values(k, 0) = GTO_alpha;
+        GTO_values(k, 1) = GTO_c1;
+        GTO_values(k, 2) = GTO_c2;
+        k++;
+    }
+    myfile.close();
+    GTO_mat = GTO_values;
+}
+
+// Fill GTO_matrices for Helium, Beryllium and Neon with 3-21G basis set
+void VMCSolver::fillAllGTOs(){
+    int num_rows_helium = 3; int num_rows_beryllium = 6; int num_rows_neon = 6;
+    GTO_helium = zeros<mat>(num_rows_helium, 3);
+    GTO_beryllium = zeros<mat>(num_rows_beryllium, 3);
+    GTO_neon = zeros<mat>(num_rows_neon, 3);
+    ReadFile_fillGTO(GTO_helium, "GTO_helium.dat");
+    ReadFile_fillGTO(GTO_beryllium, "GTO_beryllium.dat");
+    ReadFile_fillGTO(GTO_neon, "GTO_neon.dat");
+}
+
+// Computes fatorial of a given number
+double VMCSolver::factorial_func(int number){
+    int factorial = 1;
+    for(int i=number; i>0; i--){
+        factorial *= i;
+    }
+    return factorial;
+}
+
+// General expression for computing the normalization factor in GTO orbitals
+double VMCSolver::Normalization_factor(double GTO_alpha, int i, int j, int k){
+    int fac_i = factorial_func(i);
+    int fac_j = factorial_func(j);
+    int fac_k = factorial_func(k);
+    int fac_2i = factorial_func(2*i);
+    int fac_2j = factorial_func(2*j);
+    int fac_2k = factorial_func(2*k);
+
+    double frac_over = pow((8.0*GTO_alpha), (i+j+k))*fac_i*fac_j*fac_k;
+    double frac_under = fac_2i*fac_2j*fac_2k;
+
+    double N = pow(((2.0*GTO_alpha)/pi), (3.0/4.0)) * pow((frac_over/frac_under), (1.0/2.0));
+    return N;
+}
+
+// Compute G in GTO orbitals for given parameters
+double VMCSolver::G_func(double GTO_alpha, int particle, int i, int j, int k){
+    double x, y, z;
+    double r;
+    double N;
+
+    x = rNew(particle, 0);
+    y = rNew(particle, 1);
+    z = rNew(particle, 2);
+    r = r_radius(particle);
+
+    N = Normalization_factor(GTO_alpha, i, j, k);
+
+    double G = N*pow(x, i)*pow(y, j)*pow(z, k)*exp(-GTO_alpha*r*r);
+    return G;
+}
+
+
+double VMCSolver::phi_func(int orb_select, mat GTO_values, int particle, int i, int j, int k){
+
+    int sum_num;
+    double GTO_alpha;
+    double Kp = 0.5;
+    double phi = 0.0;
+
+    if(orb_select >= 2){
+        if(orb_select==2){
+            i = 1;
+        }
+        if(orb_select==3){
+            j = 1;
+        }
+        else{
+            k = 1;
+        }
+    }
+
+    if(orb_select==0){
+        sum_num = 3;
+        for(int index=0; index<sum_num; index++){
+            GTO_alpha = GTO_values(index, 0);
+            phi += GTO_values(index, 1)*G_func(GTO_alpha, particle, i, j, k);
+        }
+        phi = Kp*phi;
+    }
+
+    else{
+        sum_num = 2;
+
+        int offset = 3*orb_select;
+        if(orb_select >= 2){
+            offset = 6;
+        }
+
+        int index_count = offset;
+        for(int index = offset; index < sum_num+offset; index++){
+            GTO_alpha = GTO_values(index, 0);
+            phi += GTO_values(index, 1+i+j+k)*G_func(GTO_alpha, particle, i, j, k);
+            index_count++;
+        }
+        phi = Kp*phi;
+
+        GTO_alpha = GTO_values(index_count, 0);
+        phi += Kp*GTO_values(index_count, 1+i+j+k)*G_func(GTO_alpha, particle, i, j, k);
+
+    }
+    return phi;
+}
+
 
 // !!!!!!! Check definision in header
-void VMCSolver::GaussianOrbitals(int i, int j, int k, double GTO){
+double VMCSolver::GaussianOrbitals(mat GTO_values, int particle, int i, int j, int k){
 
-    double r;
-    double x, y, z;
+    double psi_val = 0.0;
 
-    r = r_radius(i);
-
-    x = rNew(i, 0);
-    y = rNew(i, 1);
-    z = rNew(i, 2);
-
-
-
-    //return N*pow(x, i)*pow(y, j)*pow(z, k)*exp(-GTO*r*r);
+    for(int p=0; p<nParticles/2; p++){
+        psi_val += phi_func(p, GTO_values, particle, i, j, k);
+    }
+    return psi_val;
 }
 
 

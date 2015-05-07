@@ -61,7 +61,14 @@ private:
 
     double beta_derivative_Jastrow();
     void findOptimalBeta(int my_rank, int world_size);
-    void GaussianOrbitals(int i, int j, int k, double GTO);
+
+    void ReadFile_fillGTO(mat &GTO_mat, string filename);
+    void fillAllGTOs();
+    double factorial_func(int number);
+    double Normalization_factor(double GTO_alpha, int i, int j, int k);
+    double G_func(double GTO_alpha, int particle, int i, int j, int k);
+    double phi_func(int orb_select, mat GTO_values, int particle, int i, int j, int k);
+    double GaussianOrbitals(mat GTO_values, int particle, int i, int j, int k);
 
     void update_D(mat& D_new, const mat& D_old, int i, int selector);
     void update_C(mat &CorrelationsMatrix, int k);
@@ -136,6 +143,10 @@ private:
     mat JastrowLaplacianOld;
     double JastrowEnergySum;
     double CrosstermSum;
+
+    mat GTO_helium;
+    mat GTO_beryllium;
+    mat GTO_neon;
 
 };
 
