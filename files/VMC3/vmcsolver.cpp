@@ -950,7 +950,7 @@ double VMCSolver::G_laplacian(double GTO_alpha, int particle, int i, int j, int 
 
 
 
-double VMCSolver::phiGaussian(int particle, int orb_select){
+double VMCSolver::SlaterPsiGaussian(int particle, int orb_select){
 
     int sum_num;
     int offset1;
@@ -1062,7 +1062,7 @@ double VMCSolver::phiGaussianGradient(int particle, int orb_select, int dimensio
 
 // Function to compute GTO (gaussian orbitals)
 double VMCSolver::GaussianOrbitals(int i, int j){
-    double psi_val = phiGaussian(GTO_values, i, j);
+    double psi_val = phiGaussian(i, j);
     return psi_val;
 }
 
@@ -1080,9 +1080,7 @@ void VMCSolver::fillGaussianGradient(int i){
 
 
 
-double VMCSolver::SlaterPsiGaussian(int i, int j){
-    return GaussianOrbitals(i, j);
-}
+
 
 
 
