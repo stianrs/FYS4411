@@ -1001,8 +1001,6 @@ double VMCSolver::SlaterPsiGaussian(int particle, int orb_select){
 
 
 
-
-
 double VMCSolver::phiGaussianGradient(int particle, int orb_select, int dimension){
 
     int sum_num;
