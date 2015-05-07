@@ -17,7 +17,7 @@ using namespace std;
 const double pi = 4*atan(1.0);
 
 VMCSolver::VMCSolver():
-    AtomType("helium"),
+    AtomType("beryllium"),
     nDimensions(3),
     
     energySelector("optimized"),
@@ -88,7 +88,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     fill_a_matrix();
 
     // fill GTO_matrices for Helium, Beryllium and Neon with 3-21G basis set
-    fillAllGTOs();
+    fillGTO();
 
     int n = nCycles*nParticles;
     
@@ -150,14 +150,15 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     r_func(rNew);
 
     // !!!!!!!!!!!!!!!!!!! Remove this
-    double psi_val = GaussianOrbitals(GTO_neon, 0, 0, 0, 0);
+
+    double psi_val = GaussianOrbitals(GTO_beryllium, 0, 0);
     cout << psi_val << endl;
 
-    
+
     R_sd = 1.0;
 
     // Compute everything around Slaterdeterminant
-    SlaterDeterminant(rNew);
+    SlaterDeterminant();
     D_up_old = D_up_new;
     D_down_old = D_down_new;
 
@@ -528,15 +529,15 @@ void VMCSolver::fill_a_matrix(){
 
 
 // compute the Slater determinant for the first time
-void VMCSolver::SlaterDeterminant(const mat &positions){
+void VMCSolver::SlaterDeterminant(){
     mat D_up = zeros(nParticles/2, nParticles/2);
     mat D_down = zeros(nParticles/2, nParticles/2);
 
     // compute spinn up part and spin down part
     for(int j=0; j<nParticles/2; j++){
         for(int i=0; i<nParticles/2; i++){
-            D_up(i,j) = SlaterPsi(positions, i, j);
-            D_down(i,j) = SlaterPsi(positions, i+(nParticles/2), j);
+            D_up(i,j) = SlaterPsi(i, j);
+            D_down(i,j) = SlaterPsi(i+(nParticles/2), j);
         }
     }
     D_up_new = D_up.i();
@@ -550,12 +551,12 @@ void VMCSolver::compute_R_sd(int i){
 
     if(i < nParticles/2){
         for(int j=0; j<nParticles/2; j++){
-            R_sd += SlaterPsi(rNew, i, j)*D_up_old(j, i);
+            R_sd += SlaterPsi(i, j)*D_up_old(j, i);
         }
     }
     else{
         for(int j=0; j<nParticles/2; j++){
-            R_sd += SlaterPsi(rNew, i, j)*D_down_old(j, i-nParticles/2);
+            R_sd += SlaterPsi(i, j)*D_down_old(j, i-nParticles/2);
         }
     }
 }
@@ -695,7 +696,7 @@ void VMCSolver::update_D(mat& D_new, const mat& D_old, int i, int selector){
             if(j!=i){
                 double sum = 0;
                 for(int l=0; l<nParticles/2; l++){
-                    sum += SlaterPsi(rNew, i + nParticles/2*selector, l)*D_old(l,j);
+                    sum += SlaterPsi(i + nParticles/2*selector, l)*D_old(l,j);
                 }
                 D_new(k,j) = D_old(k,j) - D_old(k, i)*sum/R_sd;
             }
@@ -811,7 +812,7 @@ void VMCSolver::ReadFile_fillGTO(mat &GTO_mat, string filename){
 }
 
 // Fill GTO_matrices for Helium, Beryllium and Neon with 3-21G basis set
-void VMCSolver::fillAllGTOs(){
+void VMCSolver::fillGTO(){
     int num_rows_helium = 3; int num_rows_beryllium = 6; int num_rows_neon = 6;
     GTO_helium = zeros<mat>(num_rows_helium, 3);
     GTO_beryllium = zeros<mat>(num_rows_beryllium, 3);
@@ -819,6 +820,22 @@ void VMCSolver::fillAllGTOs(){
     ReadFile_fillGTO(GTO_helium, "GTO_helium.dat");
     ReadFile_fillGTO(GTO_beryllium, "GTO_beryllium.dat");
     ReadFile_fillGTO(GTO_neon, "GTO_neon.dat");
+
+    if(AtomType == "helium"){
+        int num_rows = GTO_helium.n_rows;
+        GTO_values = zeros(num_rows, 3);
+        GTO_values = GTO_helium;
+    }
+    else if(AtomType == "beryllium"){
+        int num_rows = GTO_beryllium.n_rows;
+        GTO_values = zeros(num_rows, 3);
+        GTO_values = GTO_beryllium;
+    }
+    else if(AtomType == "neon"){
+        int num_rows = GTO_neon.n_rows;
+        GTO_values = zeros(num_rows, 3);
+        GTO_values = GTO_neon;
+    }
 }
 
 // Computes fatorial of a given number
@@ -864,21 +881,95 @@ double VMCSolver::G_func(double GTO_alpha, int particle, int i, int j, int k){
 }
 
 
-double VMCSolver::phi_func(int orb_select, mat GTO_values, int particle, int i, int j, int k){
+double VMCSolver::G_derivative(double GTO_alpha, int particle, int orb_select, int dimension, int i, int j, int k){
+    double x, y, z;
+    double r;
+    double N;
+    double gaussian;
+
+    x = rNew(particle, 0);
+    y = rNew(particle, 1);
+    z = rNew(particle, 2);
+    r = r_radius(particle);
+
+    gaussian = exp(-GTO_alpha*r*r);
+    N = Normalization_factor(GTO_alpha, i, j, k);
+
+    if(orb_select < 2){
+        double Factor = -2.0*N*GTO_alpha;
+        if(dimension == 0){
+            double G = Factor*x*gaussian;
+            return G;
+        }
+        else if(dimension == 1){
+            double G = Factor*y*gaussian;
+            return G;
+        }
+        else if(dimension == 2){
+            double G = Factor*z*gaussian;
+            return G;
+        }
+    }
+    else{
+        if(dimension == 0){
+            double G = -N*(2.0*GTO_alpha*x*x - 1.0)*gaussian;
+            return G;
+        }
+        else if(dimension == 1){
+            double G = -N*(2.0*GTO_alpha*y*y - 1.0)*gaussian;
+            return G;
+        }
+        else if(dimension == 2){
+            double G = -N*(2.0*GTO_alpha*z*z - 1.0)*gaussian;
+            return G;
+        }
+    }
+
+}
+
+
+double VMCSolver::G_laplacian(double GTO_alpha, int particle, int i, int j, int k){
+    double x, y, z;
+    double r;
+    double N;
+
+    x = rNew(particle, 0);
+    y = rNew(particle, 1);
+    z = rNew(particle, 2);
+    r = r_radius(particle);
+
+    N = Normalization_factor(GTO_alpha, i, j, k);
+
+    double G = 2.0*N*GTO_alpha*pow(x, i)*pow(y, j)*pow(z, k)*(2.0*GTO_alpha*r*r - 3.0)*exp(-GTO_alpha*r*r);
+    return G;
+}
+
+
+
+
+
+
+
+double VMCSolver::phiGaussian(int particle, int orb_select){
 
     int sum_num;
+    int offset1;
+    int offset2;
     double GTO_alpha;
     double Kp = 0.5;
     double phi = 0.0;
+    int i = 0;
+    int j = 0;
+    int k = 0;
 
     if(orb_select >= 2){
         if(orb_select==2){
             i = 1;
         }
-        if(orb_select==3){
+        else if(orb_select==3){
             j = 1;
         }
-        else{
+        else if(orb_select >=4 ){
             k = 1;
         }
     }
@@ -891,52 +982,120 @@ double VMCSolver::phi_func(int orb_select, mat GTO_values, int particle, int i, 
         }
         phi = Kp*phi;
     }
-
     else{
         sum_num = 2;
+        offset1 = 3;
+        offset2 = 5;
 
-        int offset = 3*orb_select;
-        if(orb_select >= 2){
-            offset = 6;
-        }
-
-        int index_count = offset;
-        for(int index = offset; index < sum_num+offset; index++){
+        for(int index = offset1; index < sum_num+offset1; index++){
             GTO_alpha = GTO_values(index, 0);
             phi += GTO_values(index, 1+i+j+k)*G_func(GTO_alpha, particle, i, j, k);
-            index_count++;
         }
         phi = Kp*phi;
 
-        GTO_alpha = GTO_values(index_count, 0);
-        phi += Kp*GTO_values(index_count, 1+i+j+k)*G_func(GTO_alpha, particle, i, j, k);
-
+        GTO_alpha = GTO_values(offset2, 0);
+        phi += Kp*GTO_values(offset2, 1+i+j+k)*G_func(GTO_alpha, particle, i, j, k);
     }
     return phi;
 }
 
 
-// !!!!!!! Check definision in header
-double VMCSolver::GaussianOrbitals(mat GTO_values, int particle, int i, int j, int k){
 
-    double psi_val = 0.0;
 
-    for(int p=0; p<nParticles/2; p++){
-        psi_val += phi_func(p, GTO_values, particle, i, j, k);
+
+double VMCSolver::phiGaussianGradient(int particle, int orb_select, int dimension){
+
+    int sum_num;
+    int offset1;
+    int offset2;
+    double GTO_alpha;
+    double Kp = 0.5;
+    double phi = 0.0;
+    int i = 0;
+    int j = 0;
+    int k = 0;
+
+    if(orb_select >= 2){
+        if(orb_select==2){
+            i = 1;
+        }
+        else if(orb_select==3){
+            j = 1;
+        }
+        else if(orb_select >=4 ){
+            k = 1;
+        }
     }
-    return psi_val;
+
+    if(orb_select==0){
+        sum_num = 3;
+        for(int index=0; index<sum_num; index++){
+            GTO_alpha = GTO_values(index, 0);
+            phi += GTO_values(index, 1)*G_derivative(GTO_alpha, particle, orb_select, dimension, i, j, k);
+        }
+        phi = Kp*phi;
+    }
+    else{
+        sum_num = 2;
+        offset1 = 3;
+        offset2 = 5;
+
+        for(int index = offset1; index < sum_num+offset1; index++){
+            GTO_alpha = GTO_values(index, 0);
+            phi += GTO_values(index, 1+i+j+k)*G_derivative(GTO_alpha, particle, orb_select, dimension, i, j, k);
+
+        }
+        phi = Kp*phi;
+
+        GTO_alpha = GTO_values(offset2, 0);
+        phi += Kp*GTO_values(offset2, 1+i+j+k)*G_derivative(GTO_alpha, particle, orb_select, dimension, i, j, k);
+    }
+    return phi;
 }
 
 
 
 
 
-double VMCSolver::SlaterPsi(const mat &positions, int i, int j){
+
+
+
+// Function to compute GTO (gaussian orbitals)
+double VMCSolver::GaussianOrbitals(int i, int j){
+    double psi_val = phiGaussian(GTO_values, i, j);
+    return psi_val;
+}
+
+
+void VMCSolver::fillGaussianGradient(int i){
+
+    mat GaussianGradient = zeros(nParticles/2, nDimensions);
+
+    for(int j=0; j<nParticles/2; j++){
+        for(int k=0; k<nDimensions; k++){
+            GaussianGradient(i, k) = phiGaussianGradient(i, j, k);
+        }
+    }
+}
+
+
+
+double VMCSolver::SlaterPsiGaussian(int i, int j){
+    return GaussianOrbitals(i, j);
+}
+
+
+
+
+double VMCSolver::SlaterPsi(int i, int j){
 
     double r;
     double x, y, z;
 
     r = r_radius(i);
+    x = rNew(i, 0);
+    y = rNew(i, 1);
+    z = rNew(i, 2);
 
     if(j == 0){
         // 1s hydrogenic orbital
@@ -949,17 +1108,14 @@ double VMCSolver::SlaterPsi(const mat &positions, int i, int j){
     }
     else if(j == 2){
         // 2px hydrogenic orbital
-        x = positions(i, 0);
         return x*exp(-alpha*r*0.5);
     }
     else if(j == 3){
         // 2py hydrogenic orbital
-        y = positions(i, 1);
         return y*exp(-alpha*r*0.5);
     }
     else if(j == 4){
         // 2px hydrogenic orbital
-        z = positions(i, 2);
         return z*exp(-alpha*r*0.5);
     }
     else{

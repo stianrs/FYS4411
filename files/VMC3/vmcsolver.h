@@ -35,8 +35,8 @@ private:
 
     void fill_a_matrix();
     double JastrowFactor();
-    double SlaterPsi(const mat &positions, int i, int j);
-    void SlaterDeterminant(const mat &positions);
+    double SlaterPsi(int i, int j);
+    void SlaterDeterminant();
     void compute_R_sd(int i);
     void SlaterGradient(int i);
     double SlaterLaplacian();
@@ -67,8 +67,9 @@ private:
     double factorial_func(int number);
     double Normalization_factor(double GTO_alpha, int i, int j, int k);
     double G_func(double GTO_alpha, int particle, int i, int j, int k);
-    double phi_func(int orb_select, mat GTO_values, int particle, int i, int j, int k);
-    double GaussianOrbitals(mat GTO_values, int particle, int i, int j, int k);
+    double phiGaussian(const mat GTO_values, int particle, int orb_select);
+    double GaussianOrbitals(const mat &GTO_values, int i, int j);
+    double SlaterPsiGaussian(int i, int j);
 
     void update_D(mat& D_new, const mat& D_old, int i, int selector);
     void update_C(mat &CorrelationsMatrix, int k);
@@ -147,6 +148,7 @@ private:
     mat GTO_helium;
     mat GTO_beryllium;
     mat GTO_neon;
+    mat GTO_values;
 
 };
 
