@@ -1,3 +1,4 @@
+/*
 #include "hydrogenic.h"
 
 #include "vmcsolver.h"
@@ -248,7 +249,7 @@ double VMCSolver::Psi_laplacian(int i, int j){
     }
 }
 
-
+*/
 
 
 

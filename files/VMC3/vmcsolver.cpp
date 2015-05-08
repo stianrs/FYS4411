@@ -689,7 +689,7 @@ void VMCSolver::findOptimalBeta(int my_rank, int world_size){
         beta = beta_new;
         counter++;
         if(counter > max_iter){
-            cout << "Max iter reached when finding beta!" << endl;
+            cout << "Max iter reached when searching for optimal beta!" << endl;
             cout << "beta: " << beta_new << endl;
             break;
         }

@@ -33,6 +33,13 @@ public:
     double Psi_laplacian(int particle, int orb_select);
 
 
+    double factorial_func(int number);
+    double Normalization_factor(double GTO_alpha, int i, int j, int k);
+    double G_func(double GTO_alpha, int particle, int i, int j, int k);
+    double G_derivative(double GTO_alpha, int particle, int orb_select, int dimension, int i, int j, int k);
+    double G_laplacian(double GTO_alpha, int particle, int orb_select, int i, int j, int k);
+
+    double GaussianOrbitals(int i, int j);
 
 
 

@@ -1,4 +1,4 @@
-/*
+
 #include "gaussian.h"
 
 #include "vmcsolver.h"
@@ -403,4 +403,4 @@ double VMCSolver::GaussianOrbitals(int i, int j){
     return psi_val;
 }
 
-*/
+

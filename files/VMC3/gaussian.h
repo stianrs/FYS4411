@@ -1,7 +1,7 @@
 #ifndef GAUSSIAN_H
 #define GAUSSIAN_H
 
-/*
+
 #include <armadillo>
 #include <fstream>
 #include <iostream>
@@ -25,6 +25,6 @@ double G_derivative(double GTO_alpha, int particle, int orb_select, int dimensio
 double G_laplacian(double GTO_alpha, int particle, int orb_select, int i, int j, int k);
 
 double GaussianOrbitals(int i, int j);
-*/
+
 
 #endif // GAUSSIAN_H
