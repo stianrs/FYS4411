@@ -1,17 +1,22 @@
 #ifndef GAUSSIAN_H
 #define GAUSSIAN_H
 
-void ReadFile_fillGTO(mat &GTO_mat, string filename);
-void fillGTO();
+/*
+#include <armadillo>
+#include <fstream>
+#include <iostream>
 
-void SlaterDeterminantGaussian();
-void compute_R_sd_gaussian(int i);
-void update_D_gaussian(mat& D_new, const mat& D_old, int i, int selector);
-void SlaterGradientGaussian(int i);
-double SlaterLaplacianGaussian();
-double SlaterPsiGaussian(int particle, int orb_select);
-double PsiGaussian_derivative(int particle, int orb_select, int dimension);
-double PsiGaussian_laplacian(int particle, int orb_select);
+using namespace std;
+using namespace arma;
+
+void SlaterDeterminant();
+void compute_R_sd(int i);
+void update_D(mat &D_new, const mat &D_old, int i, int selector);
+void SlaterGradient(int i);
+double SlaterLaplacian();
+double SlaterPsi(int particle, int orb_select);
+double Psi_derivative(int particle, int orb_select, int dimension);
+double Psi_laplacian(int particle, int orb_select);
 
 double factorial_func(int number);
 double Normalization_factor(double GTO_alpha, int i, int j, int k);
@@ -20,6 +25,6 @@ double G_derivative(double GTO_alpha, int particle, int orb_select, int dimensio
 double G_laplacian(double GTO_alpha, int particle, int orb_select, int i, int j, int k);
 
 double GaussianOrbitals(int i, int j);
-
+*/
 
 #endif // GAUSSIAN_H

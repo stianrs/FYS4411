@@ -1,9 +1,9 @@
+/*
 #include "gaussian.h"
 
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
-#include "hydrogenic.h"
 
 #include <armadillo>
 #include <iostream>
@@ -13,59 +13,7 @@
 
 using namespace arma;
 using namespace std;
-
-
-// Reads a file and store values in a matrix
-void VMCSolver::ReadFile_fillGTO(mat &GTO_mat, string filename){
-    int num_rows = GTO_mat.n_rows;
-    double GTO_alpha, GTO_c1, GTO_c2;
-    mat GTO_values = zeros(num_rows, 3);
-    ifstream myfile;
-
-    myfile.open(filename.c_str(), ios::in);
-    if(!myfile){
-        cout << "Not able to open file!" << endl;
-        exit(1);
-    }
-    int k = 0;
-    while(k<num_rows){
-        myfile >> GTO_alpha >> GTO_c1 >> GTO_c2;
-        GTO_values(k, 0) = GTO_alpha;
-        GTO_values(k, 1) = GTO_c1;
-        GTO_values(k, 2) = GTO_c2;
-        k++;
-    }
-    myfile.close();
-    GTO_mat = GTO_values;
-}
-
-
-// Fill GTO_matrices for Helium, Beryllium and Neon with 3-21G basis set
-void VMCSolver::fillGTO(){
-    int num_rows_helium = 3; int num_rows_beryllium = 6; int num_rows_neon = 6;
-    GTO_helium = zeros<mat>(num_rows_helium, 3);
-    GTO_beryllium = zeros<mat>(num_rows_beryllium, 3);
-    GTO_neon = zeros<mat>(num_rows_neon, 3);
-    ReadFile_fillGTO(GTO_helium, "GTO_helium.dat");
-    ReadFile_fillGTO(GTO_beryllium, "GTO_beryllium.dat");
-    ReadFile_fillGTO(GTO_neon, "GTO_neon.dat");
-
-    if(AtomType == "helium"){
-        int num_rows = GTO_helium.n_rows;
-        GTO_values = zeros(num_rows, 3);
-        GTO_values = GTO_helium;
-    }
-    else if(AtomType == "beryllium"){
-        int num_rows = GTO_beryllium.n_rows;
-        GTO_values = zeros(num_rows, 3);
-        GTO_values = GTO_beryllium;
-    }
-    else if(AtomType == "neon"){
-        int num_rows = GTO_neon.n_rows;
-        GTO_values = zeros(num_rows, 3);
-        GTO_values = GTO_neon;
-    }
-}
+const double pi = 4*atan(1.0);
 
 
 // compute the Slater determinant for the first time
@@ -153,7 +101,7 @@ double VMCSolver::SlaterLaplacian(){
 
     for(int i=0; i<nParticles/2; i++){
         for(int j=0; j<nParticles/2; j++){
-            derivative_up += Psi_laplacian(i, j)*D_up_new(j, i);
+            derivative_up += Psi_laplacian  (i, j)*D_up_new(j, i);
             derivative_down += Psi_laplacian(i+nParticles/2, j)*D_down_new(j, i);
         }
     }
@@ -455,4 +403,4 @@ double VMCSolver::GaussianOrbitals(int i, int j){
     return psi_val;
 }
 
-
+*/
