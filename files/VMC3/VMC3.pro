@@ -6,14 +6,18 @@ CONFIG -= qt
 SOURCES += main.cpp \
     investigate.cpp \
     lib.cpp \
-    vmcsolver.cpp
+    vmcsolver.cpp \
+    gaussian.cpp \
+    hydrogenic.cpp
 
 OTHER_FILES +=
 
 HEADERS += \
     investigate.h \
     lib.h \
-    vmcsolver.h
+    vmcsolver.h \
+    gaussian.h \
+    hydrogenic.h
 
 LIBS += -larmadillo -lblas -llapack
 

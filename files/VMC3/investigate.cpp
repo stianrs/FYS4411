@@ -6,6 +6,8 @@ and functions to perform spesific collection of data from MC simulations
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
+#include "hydrogenic.h"
+#include "gaussian.h"
 
 #include <armadillo>
 #include <iostream>
