@@ -40,8 +40,8 @@ private:
     void compute_R_sd(int i);
     void SlaterGradient(int i);
     double SlaterLaplacian();
-    double Psi_first_derivative(int i, int j, int k);
-    double Psi_second_derivative(int i, int j);
+    double Psi_derivative(int i, int j, int k);
+    double Psi_laplacian(int i, int j);
 
     double SlaterBeryllium();
     double JastrowMultiplicator();
@@ -59,20 +59,32 @@ private:
     void computeJastrowLaplacian(int k);
     double computeJastrowEnergy();
 
+    void update_D(mat& D_new, const mat& D_old, int i, int selector);
+    void update_C(mat &CorrelationsMatrix, int k);
+
+
     double beta_derivative_Jastrow();
     void findOptimalBeta(int my_rank, int world_size);
 
     void ReadFile_fillGTO(mat &GTO_mat, string filename);
     void fillGTO();
+
+    void SlaterDeterminantGaussian();
+    void compute_R_sd_gaussian(int i);
+    void update_D_gaussian(mat& D_new, const mat& D_old, int i, int selector);
+    void SlaterGradientGaussian(int i);
+    double SlaterLaplacianGaussian();
+    double SlaterPsiGaussian(int particle, int orb_select);
+    double PsiGaussian_derivative(int particle, int orb_select, int dimension);
+    double PsiGaussian_laplacian(int particle, int orb_select);
+
     double factorial_func(int number);
     double Normalization_factor(double GTO_alpha, int i, int j, int k);
     double G_func(double GTO_alpha, int particle, int i, int j, int k);
-    double phiGaussian(int particle, int orb_select);
-    double GaussianOrbitals(int i, int j);
-    double SlaterPsiGaussian(int i, int j);
+    double G_derivative(double GTO_alpha, int particle, int orb_select, int dimension, int i, int j, int k);
+    double G_laplacian(double GTO_alpha, int particle, int orb_select, int i, int j, int k);
 
-    void update_D(mat& D_new, const mat& D_old, int i, int selector);
-    void update_C(mat &CorrelationsMatrix, int k);
+    double GaussianOrbitals(int i, int j);
 
 
     string AtomType;

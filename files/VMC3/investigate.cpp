@@ -40,7 +40,7 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
 
     nCycles = 100000;
     int nPoints = world_size*12;
-    int n = nCycles*nParticles;
+    //int n = nCycles*nParticles;
 
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
@@ -134,7 +134,7 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
             r_func(rNew);
 
             // Compute everything around Slaterdeterminant
-            SlaterDeterminant(rNew);
+            SlaterDeterminant();
             D_up_old = D_up_new;
             D_down_old = D_down_new;
 

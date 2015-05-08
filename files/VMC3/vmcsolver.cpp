@@ -149,9 +149,9 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     // Calculate r_distance and r_radius
     r_func(rNew);
 
-    // !!!!!!!!!!!!!!!!!!! Remove this
 
-    double psi_val = GaussianOrbitals(GTO_beryllium, 0, 0);
+    // !!!!!!!!!!!!!!!!!!! Remove this
+    double psi_val = GaussianOrbitals(0, 0);
     cout << psi_val << endl;
 
 
@@ -1075,6 +1075,17 @@ double VMCSolver::PsiGaussian_laplacian(int particle, int orb_select){
 }
 
 
+
+// Computes fatorial of a given number
+double VMCSolver::factorial_func(int number){
+    int factorial = 1;
+    for(int i=number; i>0; i--){
+        factorial *= i;
+    }
+    return factorial;
+}
+
+
 // General expression for computing the normalization factor in GTO orbitals
 double VMCSolver::Normalization_factor(double GTO_alpha, int i, int j, int k){
     int fac_i = factorial_func(i);
@@ -1091,15 +1102,6 @@ double VMCSolver::Normalization_factor(double GTO_alpha, int i, int j, int k){
     return N;
 }
 
-
-// Computes fatorial of a given number
-double VMCSolver::factorial_func(int number){
-    int factorial = 1;
-    for(int i=number; i>0; i--){
-        factorial *= i;
-    }
-    return factorial;
-}
 
 
 // Compute G in GTO orbitals for given parameters
@@ -1177,6 +1179,9 @@ double VMCSolver::G_derivative(double GTO_alpha, int particle, int orb_select, i
             return G;
         }
     }
+    else{
+        return 0;
+    }
 }
 
 // Compute G laplacian in GTO orbitals for given parameters
@@ -1208,10 +1213,18 @@ double VMCSolver::G_laplacian(double GTO_alpha, int particle, int orb_select, in
         double G = 2.0*N*GTO_alpha*z*(2.0*GTO_alpha*r*r - 5.0)*exp(-GTO_alpha*r*r);
         return G;
     }
+    else{
+        return 0;
+    }
 }
 
 
 
+// Function to compute GTO (gaussian orbitals)
+double VMCSolver::GaussianOrbitals(int i, int j){
+    double psi_val = SlaterPsiGaussian(i, j);
+    return psi_val;
+}
 
 
 
