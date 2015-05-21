@@ -6,7 +6,7 @@ in "investigate.cpp" using vmcsolver.cpp.
 #include "vmcsolver.h"
 #include "investigate.h"
 #include "hydrogenic.h"
-//#include "gaussian.h"
+#include "gaussian.h"
 
 
 #include <iostream>

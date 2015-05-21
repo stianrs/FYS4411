@@ -5,8 +5,8 @@ This is the program with the MC solver both with and without importrance samplin
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
-//#include "hydrogenic.h"
-#include "gaussian.h" ???????????????? how to do this??
+#include "hydrogenic.h"
+#include "gaussian.h"
 
 #include <armadillo>
 #include <iostream>
@@ -359,6 +359,13 @@ double VMCSolver::localEnergy(const mat &r)
                 potentialEnergy += 1.0/sqrt(r_ij);
             }
         }
+    /*
+        if(AtomType == "H2"){
+            potentialEnergy -= (1.0/r
+        }
+
+        */
+
         if (activate_JastrowFactor){
             double slaterLaplacianEnergy = SlaterLaplacian();
             double JastrowEnergy = computeJastrowEnergy();

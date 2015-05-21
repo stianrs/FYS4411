@@ -117,6 +117,7 @@ private:
     mat r_distanceOld;
     mat a_matrix;
     vec r_radius;
+    vec r_radius2;
     vec r_radiusOld;
 
     vec energy_single;

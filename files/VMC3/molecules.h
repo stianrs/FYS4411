@@ -1,3 +1,4 @@
+/*
 #ifndef MOLECULES_H
 #define MOLECULES_H
 
@@ -18,3 +19,4 @@ double Psi_derivative(int particle, int orb_select, int dimension);
 double Psi_laplacian(int particle, int orb_select);
 
 #endif // MOLECULES_H
+*/

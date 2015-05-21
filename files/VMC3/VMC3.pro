@@ -7,7 +7,7 @@ SOURCES += main.cpp \
     investigate.cpp \
     lib.cpp \
     vmcsolver.cpp \
-    gaussian.cpp \
+    #gaussian.cpp \
     hydrogenic.cpp \
     molecules.cpp
 
@@ -17,7 +17,7 @@ HEADERS += \
     investigate.h \
     lib.h \
     vmcsolver.h \
-    gaussian.h \
+    #gaussian.h \
     hydrogenic.h \
     molecules.h
 
