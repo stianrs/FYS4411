@@ -375,11 +375,13 @@ double VMCSolver::localEnergy(const mat &r)
             }
         }
 
+        // Potential energy in molecules
         if(AtomType == "H2"){
-            potentialEnergy -=
+            potentialEnergy += MoleculePotentialEnergy();
+
         }
-        else if (AtomType == "Be2"){
-            potentialEnergy -=
+        else if(AtomType == "Be2"){
+            potentialEnergy += MoleculePotentialEnergy();
         }
 
 
@@ -502,14 +504,14 @@ void VMCSolver::r_func(const mat &positions){
             double r_position2 = 0;
             for(int k = 0; k < nDimensions; k++){
                 r_ij += (positions(i,k) - positions(j,k)) * (positions(i,k) - positions(j,k));
-                r_position += positions(i,k)*positions(i,k);
             }
-            r_position2 = positions(i,0)*positions(i,0) + positions(i,1)*positions(i,1) + (positions(i,2) + R_molecule)*(positions(i,2) + R_molecule);
+            r_position = positions(i,0)*positions(i,0) + positions(i,1)*positions(i,1) + (positions(i,2) + R_molecule/2.0)*(positions(i,2) + R_molecule/2.0);
+            r_position2 = positions(i,0)*positions(i,0) + positions(i,1)*positions(i,1) + (positions(i,2) - R_molecule/2.0)*(positions(i,2) - R_molecule/2.0);
 
             distance(i,j) = sqrt(r_ij);
             distance(j,i) = distance(i,j);
             radius(i) = sqrt(r_position);
-            radius1(i) = sqrt(r_position2);
+            radius2(i) = sqrt(r_position2);
         }
         r_distance = distance;
         r_radius = radius;
@@ -518,12 +520,14 @@ void VMCSolver::r_func(const mat &positions){
 }
 
 
-double VMCSolver::MoleculePotentialEnergy(int i){
+// Se på r_distance i morgen
+double VMCSolver::MoleculePotentialEnergy(){
     double potentialEnergy = 0.0;
     for(int i=0; i<nParticles; i++){
         potentialEnergy += -charge/r_radius(i) -charge/r_radius2(i);
     }
     potentialEnergy += charge*charge/abs(R_molecule);
+    return potentialEnergy;
 }
 
 

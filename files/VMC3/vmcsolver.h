@@ -79,6 +79,8 @@ private:
     void ReadFile_fillGTO(mat &GTO_mat, string filename);
     void fillGTO();
 
+    double MoleculePotentialEnergy();
+
 
 
     string AtomType;
