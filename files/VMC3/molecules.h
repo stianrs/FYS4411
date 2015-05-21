@@ -1,6 +1,5 @@
-#ifndef HYDROGENIC_H
-#define HYDROGENIC_H
-
+#ifndef MOLECULES_H
+#define MOLECULES_H
 
 #include <armadillo>
 #include <fstream>
@@ -18,5 +17,4 @@ double SlaterPsi(int particle, int orb_select);
 double Psi_derivative(int particle, int orb_select, int dimension);
 double Psi_laplacian(int particle, int orb_select);
 
-
-#endif // HYDROGENIC_H
+#endif // MOLECULES_H

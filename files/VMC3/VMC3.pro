@@ -8,7 +8,8 @@ SOURCES += main.cpp \
     lib.cpp \
     vmcsolver.cpp \
     gaussian.cpp \
-    hydrogenic.cpp
+    hydrogenic.cpp \
+    molecules.cpp
 
 OTHER_FILES +=
 
@@ -17,7 +18,8 @@ HEADERS += \
     lib.h \
     vmcsolver.h \
     gaussian.h \
-    hydrogenic.h
+    hydrogenic.h \
+    molecules.h
 
 LIBS += -larmadillo -lblas -llapack
 

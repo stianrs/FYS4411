@@ -5,8 +5,8 @@ This is the program with the MC solver both with and without importrance samplin
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
-#include "hydrogenic.h"
-//#include "gaussian.h" ???????????????? how to do this??
+//#include "hydrogenic.h"
+#include "gaussian.h" ???????????????? how to do this??
 
 #include <armadillo>
 #include <iostream>
@@ -19,7 +19,7 @@ using namespace std;
 const double pi = 4*atan(1.0);
 
 VMCSolver::VMCSolver():
-    AtomType("beryllium"),
+    AtomType("helium"),
     nDimensions(3),
     
     energySelector("optimized"),

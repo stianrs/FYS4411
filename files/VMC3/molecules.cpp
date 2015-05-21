@@ -1,5 +1,4 @@
-
-#include "hydrogenic.h"
+#include "molecules.h"
 
 #include "vmcsolver.h"
 #include "lib.h"
@@ -70,10 +69,6 @@ void VMCSolver::update_D(mat& D_new, const mat& D_old, int i, int selector){
         }
     }
 }
-
-
-
-
 
 
 // compute slater first derivative
@@ -248,6 +243,14 @@ double VMCSolver::Psi_laplacian(int i, int j){
         return 0;
     }
 }
+
+
+
+
+
+
+
+
 
 
 
