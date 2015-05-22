@@ -1,3 +1,4 @@
+
 /*
 This is the program with the MC solver both with and without importrance sampling
 */
@@ -21,7 +22,7 @@ using namespace std;
 const double pi = 4*atan(1.0);
 
 VMCSolver::VMCSolver():
-    AtomType("Helium"),
+    AtomType("Be2"),
     nDimensions(3),
 
     energySelector("optimized"),
@@ -53,25 +54,25 @@ double VMCSolver::runMonteCarloIntegration(int nCycles, int my_rank, int world_s
 
 
 void VMCSolver::SetParametersAtomType(string AtomType){
-    if (AtomType == "helium"){
+    if (AtomType == "He"){
         charge = 2;
         nParticles = 2;
         alpha = 1.85;
-        //beta = 0.35;
+        beta = 0.35;
         R_molecule = 0;
     }
-    else if(AtomType == "beryllium"){
+    else if(AtomType == "Be"){
         charge = 4;
         nParticles = 4;
         alpha = 3.9;
-        //beta = 0.1;
+        beta = 0.1;
         R_molecule = 0;
     }
-    else if(AtomType == "neon"){
+    else if(AtomType == "Ne"){
         charge = 10;
         nParticles = 10;
         alpha = 10.2;
-        //beta = 0.09;
+        beta = 0.09;
         R_molecule = 0;
     }
     else if(AtomType == "H2"){
@@ -218,7 +219,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     // loop over Monte Carlo cycles
     for(int cycle = 0; cycle < nCycles; cycle++) {
 
-        cout << endl;
         // New position to test
         for(int i = 0; i < nParticles; i++) {
             for(int j = 0; j < nDimensions; j++) {
@@ -459,7 +459,7 @@ double VMCSolver::localEnergy(const mat &r)
 
     // analytical expressions for local energy of Helium
     else {
-        if (AtomType == "helium"){
+        if (AtomType == "He"){
             double r1;
             double r2;
             double r1_sum = 0;
@@ -506,7 +506,7 @@ void VMCSolver::r_func(const mat &positions){
     vec radius = zeros(nParticles);
     vec radius2 = zeros(nParticles);
 
-    if(AtomType == "Helium" || AtomType == "Beryllium" || AtomType == "Neon"){
+    if(AtomType == "He" || AtomType == "Be" || AtomType == "Ne"){
         for(int i = 0; i < nParticles; i++){
             double r_position = 0;
             for(int j = 0; j < i+1; j++) {
@@ -802,17 +802,17 @@ void VMCSolver::fillGTO(){
     ReadFile_fillGTO(GTO_beryllium, "GTO_beryllium.dat");
     ReadFile_fillGTO(GTO_neon, "GTO_neon.dat");
 
-    if(AtomType == "helium"){
+    if(AtomType == "He"){
         int num_rows = GTO_helium.n_rows;
         GTO_values = zeros(num_rows, 3);
         GTO_values = GTO_helium;
     }
-    else if(AtomType == "beryllium"){
+    else if(AtomType == "Be"){
         int num_rows = GTO_beryllium.n_rows;
         GTO_values = zeros(num_rows, 3);
         GTO_values = GTO_beryllium;
     }
-    else if(AtomType == "neon"){
+    else if(AtomType == "Ne"){
         int num_rows = GTO_neon.n_rows;
         GTO_values = zeros(num_rows, 3);
         GTO_values = GTO_neon;
@@ -884,7 +884,7 @@ double VMCSolver::JastrowMultiplicator(){
 
 double VMCSolver::waveFunction(const mat &r)
 {
-    if (AtomType == "helium"){
+    if (AtomType == "He"){
         if (activate_JastrowFactor){
             r_func(r);
             int div = nParticles*nParticles - nParticles;
@@ -914,7 +914,7 @@ double VMCSolver::waveFunction(const mat &r)
         }
     }
 
-    else if (AtomType == "beryllium"){
+    else if (AtomType == "Be"){
         if (activate_JastrowFactor){
             r_func(r);
             double factor = JastrowMultiplicator();

@@ -148,7 +148,7 @@ double VMCSolver::Psi_derivative(int i, int j, int k){
     coor = rNew(i, k);
 
     if(j == 0){
-        if(k != 2){
+        if(k < 2){
             return (-alpha*coor*exp(-alpha*r1)/r1) + (-alpha*coor*exp(-alpha*r2)/r2);
         }
         else{
@@ -156,7 +156,7 @@ double VMCSolver::Psi_derivative(int i, int j, int k){
         }
     }
     if(j == 1){
-        if(k != 2){
+        if(k < 2){
             return (-alpha*coor*exp(-alpha*r1)/r1) - (-alpha*coor*exp(-alpha*r2)/r2);
         }
         else{
@@ -164,7 +164,7 @@ double VMCSolver::Psi_derivative(int i, int j, int k){
         }
     }
     else if(j == 2){
-        if(k != 2){
+        if(k < 2){
             return (0.25*alpha*coor*(alpha*r1 - 4.0)*exp(-alpha*r1*0.5)/r1) + (0.25*alpha*coor*(alpha*r2 - 4.0)*exp(-alpha*r2*0.5)/r2);
         }
         else{
@@ -172,7 +172,7 @@ double VMCSolver::Psi_derivative(int i, int j, int k){
         }
     }
     else if(j == 3){
-        if(k != 2){
+        if(k < 2){
             return (0.25*alpha*coor*(alpha*r1 - 4.0)*exp(-alpha*r1*0.5)/r1) - (0.25*alpha*coor*(alpha*r2 - 4.0)*exp(-alpha*r2*0.5)/r2);
         }
         else{
