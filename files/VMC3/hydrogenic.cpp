@@ -151,7 +151,8 @@ double VMCSolver::SlaterPsi(int i, int j){
         return z*exp(-alpha*r*0.5);
     }
     else{
-        return 0;
+        cout << "Reached end of orbitals!" << endl;
+        exit(1);
     }
 }
 
@@ -211,7 +212,8 @@ double VMCSolver::Psi_derivative(int i, int j, int k){
         }
     }
     else{
-        return 0;
+        cout << "Reached end of orbitals!" << endl;
+        exit(1);
     }
 }
 
@@ -245,7 +247,8 @@ double VMCSolver::Psi_laplacian(int i, int j){
         return 0.25*alpha*z*(alpha*r - 8.0)*exp(-alpha*r*0.5)/r;
     }
     else{
-        return 0;
+        cout << "Reached end of orbitals!" << endl;
+        exit(1);
     }
 }
 

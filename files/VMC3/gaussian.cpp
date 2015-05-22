@@ -357,7 +357,8 @@ double VMCSolver::G_derivative(double GTO_alpha, int particle, int orb_select, i
         }
     }
     else{
-        return 0;
+        cout << "Reached end of orbitals!" << endl;
+        exit(1);
     }
 }
 
@@ -392,7 +393,8 @@ double VMCSolver::G_laplacian(double GTO_alpha, int particle, int orb_select, in
         return G;
     }
     else{
-        return 0;
+        cout << "Reached end of orbitals!" << endl;
+        exit(1);
     }
 }
 

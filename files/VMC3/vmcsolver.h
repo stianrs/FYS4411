@@ -104,6 +104,7 @@ private:
 
     int charge;
     int nParticles;
+    double R_molecule;
 
     double alpha;
     double beta;

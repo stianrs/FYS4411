@@ -2,11 +2,13 @@
 This is the program with the MC solver both with and without importrance sampling
 */
 
+
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
 #include "hydrogenic.h"
 #include "gaussian.h"
+#include "molecules.h"
 
 #include <armadillo>
 #include <iostream>
@@ -19,16 +21,16 @@ using namespace std;
 const double pi = 4*atan(1.0);
 
 VMCSolver::VMCSolver():
-    AtomType("helium"),
+    AtomType("Helium"),
     nDimensions(3),
-    
+
     energySelector("optimized"),
     activate_JastrowFactor(true), // set true to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
-    
+
     timestep(0.0002), // timestep used in importance sampling
     D(0.5), // constant used in importance sampling
-    
+
     h(0.001), // step used in numerical integration
     h2(1000000), // 1/h^2 used in numerical integration
     idum(time(0)) // random number generator, seed=time(0) for random seed
@@ -36,6 +38,7 @@ VMCSolver::VMCSolver():
 {
     r_distance = zeros(nParticles, nParticles); // distance between electrons
     r_radius = zeros(nParticles); // distance between nucleus and electrons
+    r_radius2 = zeros(nParticles); // distance between nucleus and electrons
 }
 
 // function to run MC simualtions from main.cpp
@@ -44,7 +47,7 @@ double VMCSolver::runMonteCarloIntegration(int nCycles, int my_rank, int world_s
     fstream outfile;
     //findOptimalBeta(my_rank, world_size);
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
-    
+
     return energy_estimate;
 }
 
@@ -54,19 +57,36 @@ void VMCSolver::SetParametersAtomType(string AtomType){
         charge = 2;
         nParticles = 2;
         alpha = 1.85;
-        beta = 0.35;
+        //beta = 0.35;
+        R_molecule = 0;
     }
     else if(AtomType == "beryllium"){
         charge = 4;
         nParticles = 4;
         alpha = 3.9;
-        beta = 0.1;
+        //beta = 0.1;
+        R_molecule = 0;
     }
     else if(AtomType == "neon"){
         charge = 10;
         nParticles = 10;
         alpha = 10.2;
-        beta = 0.09;
+        //beta = 0.09;
+        R_molecule = 0;
+    }
+    else if(AtomType == "H2"){
+        charge = 1;
+        nParticles = 2;
+        alpha = 1.356;
+        beta = 0.4;
+        R_molecule = 1.40;
+    }
+    else if(AtomType == "Be2"){
+        charge = 4;
+        nParticles = 8;
+        alpha = 3.7; //???
+        beta = 0.25;
+        R_molecule = 4.63;
     }
 }
 
@@ -76,16 +96,16 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
 {
     // workload for different processors
     nCycles = nCycles/world_size;
-    
+
     // Start clock to compute spent time for Monte Carlo simulation
     clock_t start, finish;
     start = clock();
-    
+
     // Random seed between parallel processors
     this->idum += my_rank*time(0);
-    
+
     SetParametersAtomType(AtomType);
-    
+
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
 
@@ -93,39 +113,39 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     fillGTO();
 
     int n = nCycles*nParticles;
-    
+
     rOld = zeros<mat>(nParticles, nDimensions);
     rNew = zeros<mat>(nParticles, nDimensions);
-    
+
     energy_single = zeros<vec>(n);;
     energySquared_single = zeros<vec>(n);
-    
+
     D_down_old = zeros<mat>(nParticles/2, nParticles/2);
     D_down_new = zeros<mat>(nParticles/2, nParticles/2);
     D_up_old = zeros<mat>(nParticles/2, nParticles/2);
     D_up_new = zeros<mat>(nParticles/2, nParticles/2);
-    
+
     QForceOld = zeros<mat>(nParticles, nDimensions);
     QForceNew = zeros<mat>(nParticles, nDimensions);
-    
+
     SlaterGradientOld = zeros<mat>(nParticles, nDimensions);
     SlaterGradientNew = zeros<mat>(nParticles, nDimensions);
-    
+
     C_old = zeros<mat>(nParticles, nParticles);
     C_new = zeros<mat>(nParticles, nParticles);
-    
+
     JastrowDerivative = zeros<mat>(nParticles, nParticles);
     JastrowDerivativeOld = zeros<mat>(nParticles, nParticles);
     JastrowGradient = zeros<mat>(nParticles, nDimensions);
     JastrowLaplacianNew = zeros<mat>(nParticles, nParticles);
     JastrowLaplacianOld = zeros<mat>(nParticles, nParticles);
-    
+
     energy_single = zeros<vec>(n);;
     energySquared_single = zeros<vec>(n);
-    
+
     JastrowEnergySum = 0.0;
     CrosstermSum = 0.0;
-    
+
     double deltaE;
     double energySum = 0;
     double energySquaredSum = 0;
@@ -133,10 +153,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     double betaE;
     double betaDerivativeSum = 0.0;
     double energyBetaDerivativeSum = 0.0;
-    
+
     double r_ij_sum = 0.0;
     int r_ij_counter = 0;
-    
+
     int counter = 0;
     double acceptCounter = 0;
 
@@ -160,7 +180,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     D_down_old = D_down_new;
 
     //SlaterLaplacianValue = SlaterLaplacian();
-    
+
     for(int i=0; i<nParticles; i++){
         SlaterGradient(i);
     }
@@ -198,6 +218,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     // loop over Monte Carlo cycles
     for(int cycle = 0; cycle < nCycles; cycle++) {
 
+        cout << endl;
         // New position to test
         for(int i = 0; i < nParticles; i++) {
             for(int j = 0; j < nDimensions; j++) {
@@ -324,11 +345,13 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     finish = clock();
     cpu_time = ((finish - start)/((double) CLOCKS_PER_SEC));
 
-    cout << "With importance sampling, processor: "  << my_rank << endl;
-    cout << "Acceptance ratio: " << ratioTrial << "   beta: " << beta << endl;
-    cout << "Energy: " << energy_mean << "   Variance: " << variance <<  "   Averange distance r_ij: " << r_ij_sum/r_ij_counter << endl;
-    cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << cpu_time << " sec" << endl;
-    cout << endl;
+    if(nCycles > 100000){
+        cout << "With importance sampling, processor: "  << my_rank << endl;
+        cout << "Acceptance ratio: " << ratioTrial << "   beta: " << beta << endl;
+        cout << "Energy: " << energy_mean << "   Variance: " << variance <<  "   Averange distance r_ij: " << r_ij_sum/r_ij_counter << endl;
+        cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << cpu_time << " sec" << endl;
+        cout << endl;
+    }
 }
 
 
@@ -359,12 +382,11 @@ double VMCSolver::localEnergy(const mat &r)
                 potentialEnergy += 1.0/sqrt(r_ij);
             }
         }
-    /*
-        if(AtomType == "H2"){
-            potentialEnergy -= (1.0/r
-        }
 
-        */
+        // Potential energy in molecules
+        if(AtomType == "H2" || AtomType == "Be2"){
+            potentialEnergy += MoleculePotentialEnergy();
+        }
 
         if (activate_JastrowFactor){
             double slaterLaplacianEnergy = SlaterLaplacian();
@@ -415,6 +437,11 @@ double VMCSolver::localEnergy(const mat &r)
                 rSingleParticle += r(i,j)*r(i,j);
             }
             potentialEnergy -= charge / sqrt(rSingleParticle);
+        }
+
+        // Potential energy in molecules
+        if(AtomType == "H2" || AtomType == "Be2"){
+            potentialEnergy += MoleculePotentialEnergy();
         }
 
         // Contribution from electron-electron potential
@@ -477,21 +504,55 @@ double VMCSolver::localEnergy(const mat &r)
 void VMCSolver::r_func(const mat &positions){
     mat distance = zeros(nParticles, nParticles);
     vec radius = zeros(nParticles);
-    for(int i = 0; i < nParticles; i++){
-        for(int j = 0; j < i+1; j++) {
-            double r_ij = 0;
+    vec radius2 = zeros(nParticles);
+
+    if(AtomType == "Helium" || AtomType == "Beryllium" || AtomType == "Neon"){
+        for(int i = 0; i < nParticles; i++){
             double r_position = 0;
-            for(int k = 0; k < nDimensions; k++){
-                r_ij += (positions(i,k) - positions(j,k)) * (positions(i,k) - positions(j,k));
-                r_position += positions(i,k)*positions(i,k);
+            for(int j = 0; j < i+1; j++) {
+                double r_ij = 0;
+                for(int k = 0; k < nDimensions; k++){
+                    r_ij += (positions(i,k) - positions(j,k)) * (positions(i,k) - positions(j,k));
+                }
+                distance(i,j) = sqrt(r_ij);
+                distance(j,i) = distance(i,j);
             }
-            distance(i,j) = sqrt(r_ij);
-            distance(j,i) = distance(i,j);
+            r_position = positions(i,0)*positions(i,0) + positions(i,1)*positions(i,1) + (positions(i,2))*(positions(i,2));
             radius(i) = sqrt(r_position);
         }
         r_distance = distance;
         r_radius = radius;
     }
+    else{
+        for(int i = 0; i < nParticles; i++){
+            double r_position = 0;
+            double r_position2 = 0;
+            for(int j = 0; j < i+1; j++) {
+                double r_ij = 0;
+                for(int k = 0; k < nDimensions; k++){
+                    r_ij += (positions(i,k) - positions(j,k)) * (positions(i,k) - positions(j,k));
+                }
+                distance(i,j) = sqrt(r_ij);
+                distance(j,i) = distance(i,j);
+            }
+            r_position = positions(i,0)*positions(i,0) + positions(i,1)*positions(i,1) + (positions(i,2) + R_molecule/2.0)*(positions(i,2) + R_molecule/2.0);
+            r_position2 = positions(i,0)*positions(i,0) + positions(i,1)*positions(i,1) + (positions(i,2) - R_molecule/2.0)*(positions(i,2) - R_molecule/2.0);
+            radius(i) = sqrt(r_position);
+            radius2(i) = sqrt(r_position2);
+        }
+        r_distance = distance;
+        r_radius = radius;
+        r_radius2 = radius2;
+    }
+}
+
+double VMCSolver::MoleculePotentialEnergy(){
+    double potentialEnergy = 0.0;
+    for(int i=0; i<nParticles; i++){
+        potentialEnergy += -charge/r_radius(i) -charge/r_radius2(i);
+    }
+    potentialEnergy += charge*charge/abs(R_molecule);
+    return potentialEnergy;
 }
 
 
@@ -678,7 +739,7 @@ double VMCSolver::beta_derivative_Jastrow(){
 
 void VMCSolver::findOptimalBeta(int my_rank, int world_size){
     int nCycles = 10000;
-    int max_iter = 30;
+    int max_iter = 50;
     double step = 0.1;
     const double precision = 1.0e-4;
 
@@ -874,123 +935,9 @@ double VMCSolver::waveFunction(const mat &r)
 
 
 
-/*
-double VMCSolver::fillSolidHarmonics(int ml, int l){
-    mat SolidHarmonics = zeros(7, 4);
 
-    double r;
-    double x, y, z;
 
-    r = r_radius(i);
-    x = rNew(i, 0);
-    y = rNew(i, 1);
-    z = rNew(i, 2);
 
-    if(ml == 3){
-        if(l == 0){
-            return 0;
-        }
-        else if(l == 1){
-            return 0;
-        }
-        else if(l == 2){
-            return 0;
-        }
-        else{
-            return 0.5*sqrt(5.0/2.0)*(x*x - 3*y*y)*x;
-        }
-    }
 
-    else if(ml == 2){
-        if(l == 0){
-            return 0;
-        }
-        else if(l == 1){
-            return 0;
-        }
-        else if(l == 2){
-            return 0.5*sqrt(3.0)*(x*x - y*y);
-        }
-        else{
-            return 0.5*sqrt(15.0)*(x*x - y*y)*z;
-        }
-    }
 
-    else if(ml == 1){
-        if(l == 0){
-            return 0;
-        }
-        else if(l == 1){
-            return x;
-        }
-        else if(l == 2){
-            return sqrt(3.0)*x*z;
-        }
-        else{
-            return 0.5*sqrt(3.0/2.0)*(5.0*z*z - r*r)*x;
-        }
-    }
 
-    else if(ml == 0){
-        if(l == 0){
-            return 0;
-        }
-        else if(l == 1){
-            return y;
-        }
-        else if(l == 2){
-            return 0.5*(3.0*z*z - r*r);
-        }
-        else{
-            return 0.5*(5*z*z - 3.0*r*r)*x;
-        }
-    }
-
-    else if(ml == -1){
-        if(l == 0){
-            return 0;
-        }
-        else if(l == 1){
-            return z;
-        }
-        else if(l == 2){
-            return sqrt(3.0)*y*z;
-        }
-        else{
-            return 0.5*sqrt(3.0/2.0)*(5.0*z*z - r*r)*y;
-        }
-    }
-
-    else if(ml == -2){
-        if(l == 0){
-            return 0;
-        }
-        else if(l == 1){
-            return 0;
-        }
-        else if(l == 2){
-            return sqrt(3.0)*x*y;
-        }
-        else{
-            return sqrt(15.0)*x*y*z;
-        }
-    }
-
-    else{
-        if(l == 0){
-            return 0;
-        }
-        else if(l == 1){
-            return 0;
-        }
-        else if(l == 2){
-            return 0;
-        }
-        else{
-            return 0.5*sqrt(5.0/2.0)*(3*x*x - y*y)*y;
-        }
-    }
-
-}
-
-*/
