@@ -385,10 +385,10 @@ void VMCSolver::BlockingFunc(int my_rank, int world_size){
 // function that run a MC simulation, storing all intermediate positions for all electrons, and write the postions to file
 void VMCSolver::OnebodyDensity_ChargeDensity(int my_rank, int world_size){
 
-    nCycles = 50000;
+    nCycles = 1000000;
 
     fstream outfile;
-    outfile.open("OnebodyDensity_ChargeDensity_Be2_2.dat", ios::out);
+    outfile.open("OnebodyDensity_ChargeDensity_H2_2.dat", ios::out);
     save_positions = true;
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
     outfile.close();
@@ -396,9 +396,9 @@ void VMCSolver::OnebodyDensity_ChargeDensity(int my_rank, int world_size){
 
 
 void VMCSolver::R_dependence_molecules(int my_rank, int world_size){
-    nCycles = 500000;
+    nCycles = 1000000;
 
-    int R_iter = 20;
+    int R_iter = 40;
     fstream outfile;
     outfile.open("R_dependence_molecule_H2_minus.dat", ios::out);
 

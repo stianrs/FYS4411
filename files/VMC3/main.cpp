@@ -31,8 +31,8 @@ int main(int nargs, char *args[])
     MPI_Comm_rank (MPI_COMM_WORLD, &my_rank);
     MPI_Comm_size (MPI_COMM_WORLD, &world_size);
 
-    //VMCSolver *solver = new VMCSolver();
-    //energy = solver->runMonteCarloIntegration(nCycles, my_rank, world_size);
+    VMCSolver *solver = new VMCSolver();
+    energy = solver->runMonteCarloIntegration(nCycles, my_rank, world_size);
 
     // Collect energy estimates
     MPI_Reduce(&energy, &sum_energy, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -49,8 +49,8 @@ int main(int nargs, char *args[])
     //VMCSolver *investigateParameters = new VMCSolver();
     //investigateParameters->InvestigateOptimalParameters(my_rank, world_size);
 
-    VMCSolver *Blocking = new VMCSolver();
-    Blocking->BlockingFunc(my_rank, world_size);
+    //VMCSolver *Blocking = new VMCSolver();
+    //Blocking->BlockingFunc(my_rank, world_size);
 
     //VMCSolver *investigateOnebodyDensity_ChargeDensity = new VMCSolver();
     //investigateOnebodyDensity_ChargeDensity ->OnebodyDensity_ChargeDensity(my_rank, world_size);
@@ -61,6 +61,7 @@ int main(int nargs, char *args[])
 
     // Clean up and close the MPI environment
     MPI_Finalize();
+
 
 
     /*

@@ -22,7 +22,7 @@ using namespace std;
 const double pi = 4*atan(1.0);
 
 VMCSolver::VMCSolver():
-    AtomType("Be2"),
+    AtomType("H2"),
     nDimensions(3),
 
     energySelector("optimized"),
