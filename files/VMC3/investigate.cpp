@@ -373,7 +373,7 @@ void VMCSolver::BlockingFunc(int my_rank, int world_size){
     fstream outfile;
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
 
-    outfile.open("Blocking_data_neon.dat", ios::out);
+    outfile.open("Blocking_data_Be2_new.dat", ios::out);
     for(int i=0; i < nCycles*nParticles; i++){
         outfile << energy_single(i) << " " << energySquared_single(i) << endl;
     }
@@ -385,15 +385,32 @@ void VMCSolver::BlockingFunc(int my_rank, int world_size){
 // function that run a MC simulation, storing all intermediate positions for all electrons, and write the postions to file
 void VMCSolver::OnebodyDensity_ChargeDensity(int my_rank, int world_size){
 
-    nCycles = 5000000;
+    nCycles = 50000;
 
     fstream outfile;
-    outfile.open("OnebodyDensity_ChargeDensity_Be2.dat", ios::out);
+    outfile.open("OnebodyDensity_ChargeDensity_Be2_2.dat", ios::out);
     save_positions = true;
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
     outfile.close();
 }
 
+
+void VMCSolver::R_dependence_molecules(int my_rank, int world_size){
+    nCycles = 500000;
+
+    int R_iter = 20;
+    fstream outfile;
+    outfile.open("R_dependence_molecule_H2_minus.dat", ios::out);
+
+    for(int i=0; i<R_iter; i++){
+        R_molecule = 0.2 + 0.2*i;
+        findOptimalBeta(my_rank, world_size);
+        MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
+        cout << R_molecule << " " << beta  << " " << energy_estimate << endl;
+        outfile << R_molecule << " " << beta  << " " << energy_estimate << endl;
+    }
+    outfile.close();
+}
 
 
 

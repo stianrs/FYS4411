@@ -21,7 +21,7 @@ using namespace arma;
 
 int main(int nargs, char *args[])
 {
-    int nCycles = 1e6;
+    int nCycles = 1e7;
 
     int my_rank, world_size;
     double energy, sum_energy;
@@ -49,11 +49,15 @@ int main(int nargs, char *args[])
     //VMCSolver *investigateParameters = new VMCSolver();
     //investigateParameters->InvestigateOptimalParameters(my_rank, world_size);
 
-    //VMCSolver *Blocking = new VMCSolver();
-    //Blocking->BlockingFunc(my_rank, world_size);
+    VMCSolver *Blocking = new VMCSolver();
+    Blocking->BlockingFunc(my_rank, world_size);
 
-    VMCSolver *investigateOnebodyDensity_ChargeDensity = new VMCSolver();
-    investigateOnebodyDensity_ChargeDensity ->OnebodyDensity_ChargeDensity(my_rank, world_size);
+    //VMCSolver *investigateOnebodyDensity_ChargeDensity = new VMCSolver();
+    //investigateOnebodyDensity_ChargeDensity ->OnebodyDensity_ChargeDensity(my_rank, world_size);
+
+    //VMCSolver *investigateR_dependence_molecules = new VMCSolver();
+    //investigateR_dependence_molecules ->R_dependence_molecules(my_rank, world_size);
+
 
     // Clean up and close the MPI environment
     MPI_Finalize();

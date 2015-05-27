@@ -10,6 +10,7 @@ void InvestigateCPUtime(int my_rank, int world_size);
 void InvestigateTimestep();
 void BlockingFunc(int my_rank, int world_size);
 void OnebodyDensity_ChargeDensity(int my_rank, int world_size);
+void R_dependence_molecules(int my_rank, int world_size);
 
 
 #endif // INVESTIGATE_H

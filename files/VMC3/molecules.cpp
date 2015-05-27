@@ -152,7 +152,7 @@ double VMCSolver::Psi_derivative(int i, int j, int k){
             return (-alpha*coor*exp(-alpha*r1)/r1) + (-alpha*coor*exp(-alpha*r2)/r2);
         }
         else{
-            return (-alpha*(coor - R_2)*exp(-alpha*r1)/r1) + (-alpha*(coor + R_2)*exp(-alpha*r2)/r2);
+            return (-alpha*(coor + R_2)*exp(-alpha*r1)/r1) + (-alpha*(coor - R_2)*exp(-alpha*r2)/r2);
         }
     }
     if(j == 1){
@@ -160,7 +160,7 @@ double VMCSolver::Psi_derivative(int i, int j, int k){
             return (-alpha*coor*exp(-alpha*r1)/r1) - (-alpha*coor*exp(-alpha*r2)/r2);
         }
         else{
-            return (-alpha*(coor - R_2)*exp(-alpha*r1)/r1) - (-alpha*(coor + R_2)*exp(-alpha*r2)/r2);
+            return (-alpha*(coor + R_2)*exp(-alpha*r1)/r1) - (-alpha*(coor - R_2)*exp(-alpha*r2)/r2);
         }
     }
     else if(j == 2){
@@ -168,7 +168,7 @@ double VMCSolver::Psi_derivative(int i, int j, int k){
             return (0.25*alpha*coor*(alpha*r1 - 4.0)*exp(-alpha*r1*0.5)/r1) + (0.25*alpha*coor*(alpha*r2 - 4.0)*exp(-alpha*r2*0.5)/r2);
         }
         else{
-            return (0.25*alpha*(coor - R_2)*(alpha*r1 - 4.0)*exp(-alpha*r1*0.5)/r1) + (0.25*alpha*(coor + R_2)*(alpha*r2 - 4.0)*exp(-alpha*r2*0.5)/r2);
+            return (0.25*alpha*(coor + R_2)*(alpha*r1 - 4.0)*exp(-alpha*r1*0.5)/r1) + (0.25*alpha*(coor - R_2)*(alpha*r2 - 4.0)*exp(-alpha*r2*0.5)/r2);
         }
     }
     else if(j == 3){
@@ -176,7 +176,7 @@ double VMCSolver::Psi_derivative(int i, int j, int k){
             return (0.25*alpha*coor*(alpha*r1 - 4.0)*exp(-alpha*r1*0.5)/r1) - (0.25*alpha*coor*(alpha*r2 - 4.0)*exp(-alpha*r2*0.5)/r2);
         }
         else{
-            return (0.25*alpha*(coor - R_2)*(alpha*r1 - 4.0)*exp(-alpha*r1*0.5)/r1) - (0.25*alpha*(coor + R_2)*(alpha*r2 - 4.0)*exp(-alpha*r2*0.5)/r2);
+            return (0.25*alpha*(coor + R_2)*(alpha*r1 - 4.0)*exp(-alpha*r1*0.5)/r1) - (0.25*alpha*(coor - R_2)*(alpha*r2 - 4.0)*exp(-alpha*r2*0.5)/r2);
         }
     }
     else{

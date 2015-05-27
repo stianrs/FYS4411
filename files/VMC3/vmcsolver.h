@@ -22,6 +22,7 @@ public:
     void InvestigateTimestep();
     void BlockingFunc(int my_rank, int world_size);
     void OnebodyDensity_ChargeDensity(int my_rank, int world_size);
+    void R_dependence_molecules(int my_rank, int world_size);
 
     void SlaterDeterminant();
     void compute_R_sd(int i);

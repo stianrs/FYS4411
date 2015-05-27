@@ -29,13 +29,13 @@ VMCSolver::VMCSolver():
     activate_JastrowFactor(true), // set true to activate importance sampling
     save_positions(false), // set true to save all intermediate postitions in an MC simulation
 
-    timestep(0.0002), // timestep used in importance sampling
+    timestep(0.002), // timestep used in importance sampling
     D(0.5), // constant used in importance sampling
 
     h(0.001), // step used in numerical integration
     h2(1000000), // 1/h^2 used in numerical integration
     idum(time(0)) // random number generator, seed=time(0) for random seed
-  //idum(-1)
+    //idum(-1)
 {
     r_distance = zeros(nParticles, nParticles); // distance between electrons
     r_radius = zeros(nParticles); // distance between nucleus and electrons
@@ -46,7 +46,7 @@ VMCSolver::VMCSolver():
 double VMCSolver::runMonteCarloIntegration(int nCycles, int my_rank, int world_size)
 {
     fstream outfile;
-    //findOptimalBeta(my_rank, world_size);
+    findOptimalBeta(my_rank, world_size);
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
 
     return energy_estimate;
@@ -58,28 +58,28 @@ void VMCSolver::SetParametersAtomType(string AtomType){
         charge = 2;
         nParticles = 2;
         alpha = 1.85;
-        beta = 0.35;
+        beta = 0.259; //0.35;
         R_molecule = 0;
     }
     else if(AtomType == "Be"){
         charge = 4;
         nParticles = 4;
         alpha = 3.9;
-        beta = 0.1;
+        beta = 0.09;
         R_molecule = 0;
     }
     else if(AtomType == "Ne"){
         charge = 10;
         nParticles = 10;
         alpha = 10.2;
-        beta = 0.09;
+        beta = 0.098;
         R_molecule = 0;
     }
     else if(AtomType == "H2"){
         charge = 1;
         nParticles = 2;
         alpha = 1.356;
-        beta = 0.4;
+        beta = 0.276;//0.4;
         R_molecule = 1.40;
     }
     else if(AtomType == "Be2"){
@@ -347,7 +347,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
 
     if(nCycles > 100000){
         cout << "With importance sampling, processor: "  << my_rank << endl;
-        cout << "Acceptance ratio: " << ratioTrial << "   beta: " << beta << endl;
+        cout << "Acceptance ratio: " << ratioTrial << "   alpha: " << alpha << "   beta: " << beta << endl;
         cout << "Energy: " << energy_mean << "   Variance: " << variance <<  "   Averange distance r_ij: " << r_ij_sum/r_ij_counter << endl;
         cout << "Time consumption for " << nCycles << " Monte Carlo samples: " << cpu_time << " sec" << endl;
         cout << endl;
@@ -358,7 +358,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
 // function to compute local energy both numerical and analytical (if expression is found by user)
 double VMCSolver::localEnergy(const mat &r)
 {
-    // numerical computation of local energy
+    // optimized computation of local energy
     if (energySelector == "optimized"){
 
         // Potential energy
@@ -369,7 +369,7 @@ double VMCSolver::localEnergy(const mat &r)
             for(int j = 0; j < nDimensions; j++) {
                 rSingleParticle += r(i,j)*r(i,j);
             }
-            potentialEnergy -= charge / sqrt(rSingleParticle);
+            potentialEnergy -= 0;//charge / sqrt(rSingleParticle);
         }
 
         // Contribution from electron-electron potential
@@ -379,7 +379,7 @@ double VMCSolver::localEnergy(const mat &r)
                 for(int k = 0; k < nDimensions; k++) {
                     r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
                 }
-                potentialEnergy += 1.0/sqrt(r_ij);
+                potentialEnergy += 0;//1.0/sqrt(r_ij);
             }
         }
 
@@ -550,6 +550,8 @@ double VMCSolver::MoleculePotentialEnergy(){
     double potentialEnergy = 0.0;
     for(int i=0; i<nParticles; i++){
         potentialEnergy += -charge/r_radius(i) -charge/r_radius2(i);
+        for(int j=i+1; j<nParticles; j++)
+            potentialEnergy += 1.0/r_distance(i,j);
     }
     potentialEnergy += charge*charge/abs(R_molecule);
     return potentialEnergy;
@@ -723,7 +725,7 @@ void VMCSolver::QuantumForce(const mat &r, mat &F){
 }
 
 
-
+// compute energy of beta derivative of Jastrow factor
 double VMCSolver::beta_derivative_Jastrow(){
     double derivative_sum = 0.0;
     for(int j=0; j<nParticles; j++){
@@ -736,14 +738,14 @@ double VMCSolver::beta_derivative_Jastrow(){
 }
 
 
-
+// steepest decent optimization algorithm to find optimal beta
 void VMCSolver::findOptimalBeta(int my_rank, int world_size){
     int nCycles = 10000;
-    int max_iter = 50;
+    int max_iter = 500;
     double step = 0.1;
     const double precision = 1.0e-4;
 
-    beta = 0.34;
+    beta = 0.1;
     double beta_new = beta;
     double beta_old = 0.0;
 
@@ -925,6 +927,17 @@ double VMCSolver::waveFunction(const mat &r)
             r_func(r);
             double hydrogenic = SlaterBeryllium();
             return hydrogenic;
+        }
+    }
+    else if (AtomType == "H2"){
+        if (activate_JastrowFactor){
+
+            int div = nParticles*nParticles - nParticles;
+            double r12 = sum(sum(r_distance))/div;
+            double argument1 = sum(r_radius);
+            double argument2 = sum(r_radius2);
+
+            return exp(-argument1*alpha)*exp(r12/(2*(1.0 + beta*r12))) + exp(-argument2*alpha)*exp(r12/(2*(1.0 + beta*r12)));
         }
     }
     else{
