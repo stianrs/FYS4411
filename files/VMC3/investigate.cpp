@@ -385,10 +385,10 @@ void VMCSolver::BlockingFunc(int my_rank, int world_size){
 // function that run a MC simulation, storing all intermediate positions for all electrons, and write the postions to file
 void VMCSolver::OnebodyDensity_ChargeDensity(int my_rank, int world_size){
 
-    nCycles = 1000000;
+    nCycles = 5000000;
 
     fstream outfile;
-    outfile.open("OnebodyDensity_ChargeDensity_H2_2.dat", ios::out);
+    outfile.open("OnebodyDensity_ChargeDensity_beryllium_corrected_jastrow_new.dat", ios::out);
     save_positions = true;
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
     outfile.close();

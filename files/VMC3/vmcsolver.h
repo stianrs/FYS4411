@@ -33,12 +33,11 @@ public:
     double Psi_derivative(int particle, int orb_select, int dimension);
     double Psi_laplacian(int particle, int orb_select);
 
-
     double factorial_func(int number);
     double Normalization_factor(double GTO_alpha, int i, int j, int k);
     double G_func(double GTO_alpha, int particle, int i, int j, int k);
-    double G_derivative(double GTO_alpha, int particle, int orb_select, int dimension, int i, int j, int k);
-    double G_laplacian(double GTO_alpha, int particle, int orb_select, int i, int j, int k);
+    double G_der(double GTO_alpha, int particle, int orb_select, int dimension, int i, int j, int k);
+    double G_lap(double GTO_alpha, int particle, int orb_select, int i, int j, int k);
 
     double GaussianOrbitals(int i, int j);
 
@@ -78,7 +77,9 @@ private:
     void findOptimalBeta(int my_rank, int world_size);
 
     void ReadFile_fillGTO(mat &GTO_mat, string filename);
+    void ReadFile_fillGTO_coef(mat &GTO_coef_mat, string filename);
     void fillGTO();
+    void fillGTO_coef();
 
     double MoleculePotentialEnergy();
 
@@ -109,6 +110,8 @@ private:
 
     double alpha;
     double beta;
+
+    bool molecule;
 
     int nCycles;
     double GreensFunction;
@@ -160,6 +163,11 @@ private:
     mat GTO_beryllium;
     mat GTO_neon;
     mat GTO_values;
+
+    mat GTO_coef_helium;
+    mat GTO_coef_beryllium;
+    mat GTO_coef_neon;
+    mat GTO_coef_values;
 
 };
 

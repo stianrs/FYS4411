@@ -22,7 +22,7 @@ using namespace std;
 const double pi = 4*atan(1.0);
 
 VMCSolver::VMCSolver():
-    AtomType("H2"),
+    AtomType("He"),
     nDimensions(3),
 
     energySelector("optimized"),
@@ -35,7 +35,7 @@ VMCSolver::VMCSolver():
     h(0.001), // step used in numerical integration
     h2(1000000), // 1/h^2 used in numerical integration
     idum(time(0)) // random number generator, seed=time(0) for random seed
-    //idum(-1)
+  //idum(-1)
 {
     r_distance = zeros(nParticles, nParticles); // distance between electrons
     r_radius = zeros(nParticles); // distance between nucleus and electrons
@@ -46,7 +46,7 @@ VMCSolver::VMCSolver():
 double VMCSolver::runMonteCarloIntegration(int nCycles, int my_rank, int world_size)
 {
     fstream outfile;
-    findOptimalBeta(my_rank, world_size);
+    //findOptimalBeta(my_rank, world_size);
     MonteCarloIntegration(nCycles, outfile, my_rank, world_size);
 
     return energy_estimate;
@@ -107,11 +107,16 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
 
     SetParametersAtomType(AtomType);
 
+    if(AtomType == "He" || AtomType == "Be"|| AtomType == "Ne"){
+        molecule = false;
+    }
+
     // fill spin matrix needed if we simulate atoms with more than 2 electrons
     fill_a_matrix();
 
     // fill GTO_matrices for Helium, Beryllium and Neon with 3-21G basis set
     fillGTO();
+    fillGTO_coef();
 
     int n = nCycles*nParticles;
 
@@ -361,30 +366,32 @@ double VMCSolver::localEnergy(const mat &r)
     // optimized computation of local energy
     if (energySelector == "optimized"){
 
-        // Potential energy
         double potentialEnergy = 0;
         double rSingleParticle = 0;
-        for(int i = 0; i < nParticles; i++) {
-            rSingleParticle = 0;
-            for(int j = 0; j < nDimensions; j++) {
-                rSingleParticle += r(i,j)*r(i,j);
-            }
-            potentialEnergy -= 0;//charge / sqrt(rSingleParticle);
-        }
 
-        // Contribution from electron-electron potential
-        for(int i = 0; i < nParticles; i++) {
-            for(int j = i+1; j < nParticles; j++) {
-                double r_ij = 0;
-                for(int k = 0; k < nDimensions; k++) {
-                    r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
+        // Potential energy in atoms
+        if (molecule==false){
+            for(int i = 0; i < nParticles; i++) {
+                rSingleParticle = 0;
+                for(int j = 0; j < nDimensions; j++) {
+                    rSingleParticle += r(i,j)*r(i,j);
                 }
-                potentialEnergy += 0;//1.0/sqrt(r_ij);
+                potentialEnergy -= charge / sqrt(rSingleParticle);
+            }
+
+            // Contribution from electron-electron potential
+            for(int i = 0; i < nParticles; i++) {
+                for(int j = i+1; j < nParticles; j++) {
+                    double r_ij = 0;
+                    for(int k = 0; k < nDimensions; k++) {
+                        r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
+                    }
+                    potentialEnergy += 1.0/sqrt(r_ij);
+                }
             }
         }
-
         // Potential energy in molecules
-        if(AtomType == "H2" || AtomType == "Be2"){
+        if (molecule){
             potentialEnergy += MoleculePotentialEnergy();
         }
 
@@ -428,32 +435,36 @@ double VMCSolver::localEnergy(const mat &r)
         }
         kineticEnergy = 0.5 * h2 * kineticEnergy / waveFunctionCurrent;
 
-        // Potential energy
         double potentialEnergy = 0;
         double rSingleParticle = 0;
-        for(int i = 0; i < nParticles; i++) {
-            rSingleParticle = 0;
-            for(int j = 0; j < nDimensions; j++) {
-                rSingleParticle += r(i,j)*r(i,j);
+
+        if(molecule==false){
+            // Potential energy atoms
+            for(int i = 0; i < nParticles; i++) {
+                rSingleParticle = 0;
+                for(int j = 0; j < nDimensions; j++) {
+                    rSingleParticle += r(i,j)*r(i,j);
+                }
+                potentialEnergy -= charge / sqrt(rSingleParticle);
             }
-            potentialEnergy -= charge / sqrt(rSingleParticle);
+
+            // Contribution from electron-electron potential
+            for(int i = 0; i < nParticles; i++) {
+                for(int j = i+1; j < nParticles; j++) {
+                    double r_ij = 0;
+                    for(int k = 0; k < nDimensions; k++) {
+                        r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
+                    }
+                    potentialEnergy += 1.0/sqrt(r_ij);
+                }
+            }
         }
 
         // Potential energy in molecules
-        if(AtomType == "H2" || AtomType == "Be2"){
+        if(molecule){
             potentialEnergy += MoleculePotentialEnergy();
         }
 
-        // Contribution from electron-electron potential
-        for(int i = 0; i < nParticles; i++) {
-            for(int j = i+1; j < nParticles; j++) {
-                double r_ij = 0;
-                for(int k = 0; k < nDimensions; k++) {
-                    r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
-                }
-                potentialEnergy += 1.0/sqrt(r_ij);
-            }
-        }
         return kineticEnergy + potentialEnergy;
     }
 
@@ -506,7 +517,7 @@ void VMCSolver::r_func(const mat &positions){
     vec radius = zeros(nParticles);
     vec radius2 = zeros(nParticles);
 
-    if(AtomType == "He" || AtomType == "Be" || AtomType == "Ne"){
+    if(molecule!=true){
         for(int i = 0; i < nParticles; i++){
             double r_position = 0;
             for(int j = 0; j < i+1; j++) {
@@ -560,14 +571,12 @@ double VMCSolver::MoleculePotentialEnergy(){
 
 // write positons to file
 void VMCSolver::save_positions_func(const mat &r, fstream &outfile){
-    int counter_pos = 0;
-    for(int i=0; i < nParticles; i++){
+    for(int i= 0; i < nParticles; i++){
         for(int j=0; j < nDimensions; j++){
             outfile << r(i, j) << " ";
-            counter_pos++;
         }
+        outfile << endl;
     }
-    outfile << endl;
 }
 
 
@@ -771,8 +780,8 @@ void VMCSolver::findOptimalBeta(int my_rank, int world_size){
 // Reads a file and store values in a matrix
 void VMCSolver::ReadFile_fillGTO(mat &GTO_mat, string filename){
     int num_rows = GTO_mat.n_rows;
-    double GTO_alpha, GTO_c1, GTO_c2;
-    mat GTO_values = zeros(num_rows, 3);
+    double GTO_alpha, GTO_c;
+    mat GTO_values = zeros(num_rows, 2);
     ifstream myfile;
 
     myfile.open(filename.c_str(), ios::in);
@@ -782,42 +791,94 @@ void VMCSolver::ReadFile_fillGTO(mat &GTO_mat, string filename){
     }
     int k = 0;
     while(k<num_rows){
-        myfile >> GTO_alpha >> GTO_c1 >> GTO_c2;
+        myfile >> GTO_alpha >> GTO_c;
         GTO_values(k, 0) = GTO_alpha;
-        GTO_values(k, 1) = GTO_c1;
-        GTO_values(k, 2) = GTO_c2;
+        GTO_values(k, 1) = GTO_c;
         k++;
     }
     myfile.close();
     GTO_mat = GTO_values;
 }
 
+// Reads a file and store values in a matrix
+void VMCSolver::ReadFile_fillGTO_coef(mat &GTO_coef_mat, string filename){
+    int num_rows = GTO_coef_mat.n_rows;
+    double GTO_c1, GTO_c2, GTO_c3, GTO_c4, GTO_c5;
+    mat GTO_coef_values = zeros(num_rows, 5);
+    ifstream myfile;
+
+    myfile.open(filename.c_str(), ios::in);
+    if(!myfile){
+        cout << "Not able to open file!" << endl;
+        exit(1);
+    }
+    int k = 0;
+    while(k<num_rows){
+        myfile >> GTO_c1 >> GTO_c2 >> GTO_c3 >> GTO_c4 >> GTO_c5;
+        GTO_coef_values(k, 0) = GTO_c1;
+        GTO_coef_values(k, 1) = GTO_c2;
+        GTO_coef_values(k, 2) = GTO_c3;
+        GTO_coef_values(k, 3) = GTO_c4;
+        GTO_coef_values(k, 4) = GTO_c5;
+        k++;
+    }
+    myfile.close();
+    GTO_coef_mat = GTO_coef_values;
+}
 
 
 // Fill GTO_matrices for Helium, Beryllium and Neon with 3-21G basis set
 void VMCSolver::fillGTO(){
-    int num_rows_helium = 3; int num_rows_beryllium = 6; int num_rows_neon = 6;
-    GTO_helium = zeros<mat>(num_rows_helium, 3);
-    GTO_beryllium = zeros<mat>(num_rows_beryllium, 3);
-    GTO_neon = zeros<mat>(num_rows_neon, 3);
+    int num_rows_helium = 3; int num_rows_beryllium = 9; int num_rows_neon = 9;
+    GTO_helium = zeros<mat>(num_rows_helium, 2);
+    GTO_beryllium = zeros<mat>(num_rows_beryllium, 2);
+    GTO_neon = zeros<mat>(num_rows_neon, 2);
     ReadFile_fillGTO(GTO_helium, "GTO_helium.dat");
     ReadFile_fillGTO(GTO_beryllium, "GTO_beryllium.dat");
     ReadFile_fillGTO(GTO_neon, "GTO_neon.dat");
 
     if(AtomType == "He"){
         int num_rows = GTO_helium.n_rows;
-        GTO_values = zeros(num_rows, 3);
+        GTO_values = zeros(num_rows, 2);
         GTO_values = GTO_helium;
     }
     else if(AtomType == "Be"){
         int num_rows = GTO_beryllium.n_rows;
-        GTO_values = zeros(num_rows, 3);
+        GTO_values = zeros(num_rows, 2);
         GTO_values = GTO_beryllium;
     }
     else if(AtomType == "Ne"){
         int num_rows = GTO_neon.n_rows;
-        GTO_values = zeros(num_rows, 3);
+        GTO_values = zeros(num_rows, 2);
         GTO_values = GTO_neon;
+    }
+}
+
+
+// Fill GTO_matrices for Helium, Beryllium and Neon with 3-21G basis set
+void VMCSolver::fillGTO_coef(){
+    int num_rows_helium = 2; int num_rows_beryllium = 9; int num_rows_neon = 9;
+    GTO_coef_helium = zeros<mat>(num_rows_helium, 1);
+    GTO_coef_beryllium = zeros<mat>(num_rows_beryllium, 2);
+    GTO_coef_neon = zeros<mat>(num_rows_neon, 5);
+    ReadFile_fillGTO_coef(GTO_coef_helium, "GTO_coef_helium.dat");
+    ReadFile_fillGTO_coef(GTO_coef_beryllium, "GTO_coef_beryllium.dat");
+    ReadFile_fillGTO_coef(GTO_coef_neon, "GTO_coef_neon.dat");
+
+    if(AtomType == "He"){
+        int num_rows = GTO_coef_helium.n_rows;
+        GTO_coef_values = zeros(num_rows, 1);
+        GTO_coef_values = GTO_coef_helium;
+    }
+    else if(AtomType == "Be"){
+        int num_rows = GTO_coef_beryllium.n_rows;
+        GTO_coef_values = zeros(num_rows, 2);
+        GTO_coef_values = GTO_coef_beryllium;
+    }
+    else if(AtomType == "Ne"){
+        int num_rows = GTO_coef_neon.n_rows;
+        GTO_coef_values = zeros(num_rows, 5);
+        GTO_coef_values = GTO_coef_neon;
     }
 }
 
