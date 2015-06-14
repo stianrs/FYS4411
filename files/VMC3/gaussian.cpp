@@ -1,10 +1,9 @@
+// This file contain all Slater functions and orbitals needed for using GTO wave functions
 
 #include "gaussian.h"
-
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
-
 #include <armadillo>
 #include <iostream>
 #include <time.h>

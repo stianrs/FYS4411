@@ -1,8 +1,6 @@
-
 /*
-This is the program with the MC solver both with and without importrance sampling
+This is the program with the MC solver with importrance sampling
 */
-
 
 #include "vmcsolver.h"
 #include "lib.h"
@@ -10,7 +8,6 @@ This is the program with the MC solver both with and without importrance samplin
 #include "hydrogenic.h"
 #include "gaussian.h"
 #include "molecules.h"
-
 #include <armadillo>
 #include <iostream>
 #include <time.h>
@@ -35,7 +32,7 @@ VMCSolver::VMCSolver():
     h(0.001), // step used in numerical integration
     h2(1000000), // 1/h^2 used in numerical integration
     idum(time(0)) // random number generator, seed=time(0) for random seed
-  //idum(-1)
+  //idum(-1) // for same random numbers every time
 {
     r_distance = zeros(nParticles, nParticles); // distance between electrons
     r_radius = zeros(nParticles); // distance between nucleus and electrons
@@ -53,6 +50,7 @@ double VMCSolver::runMonteCarloIntegration(int nCycles, int my_rank, int world_s
 }
 
 
+// set system parameters
 void VMCSolver::SetParametersAtomType(string AtomType){
     if (AtomType == "He"){
         charge = 2;
@@ -85,14 +83,14 @@ void VMCSolver::SetParametersAtomType(string AtomType){
     else if(AtomType == "Be2"){
         charge = 4;
         nParticles = 8;
-        alpha = 3.7; //???
+        alpha = 3.7;
         beta = 0.25;
         R_molecule = 4.63;
     }
 }
 
 
-// The Monte Carlo solver both with and without importance sampling
+// The Monte Carlo solver both with importance sampling
 void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank, int world_size)
 {
     // workload for different processors
@@ -177,7 +175,6 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     // Calculate r_distance and r_radius
     r_func(rNew);
 
-
     R_sd = 1.0;
 
     // Compute everything around Slaterdeterminant
@@ -185,12 +182,10 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
     D_up_old = D_up_new;
     D_down_old = D_down_new;
 
-    //SlaterLaplacianValue = SlaterLaplacian();
-
+    // Compute slater gradient
     for(int i=0; i<nParticles; i++){
         SlaterGradient(i);
     }
-
     SlaterGradientOld = SlaterGradientNew;
 
     // Compute everything about Jastrowfactor
@@ -257,6 +252,7 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
             R = R_sd*R_c;
 
             // The Metropolis test is performed by moving one particle at the time
+            // accepted move:
             if(ran2(&idum) <= GreensFunction*R*R){
                 for(int j = 0; j < nDimensions; j++){
                     rOld(i,j) = rNew(i,j);
@@ -286,10 +282,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
                 energySquaredSum += deltaE*deltaE;
 
                 betaE = beta_derivative_Jastrow();
-
                 betaDerivativeSum += betaE;
                 energyBetaDerivativeSum += deltaE*betaE;
-
 
                 energy_single(counter) = deltaE;
                 energySquared_single(counter) = deltaE*deltaE;
@@ -304,8 +298,8 @@ void VMCSolver::MonteCarloIntegration(int nCycles, fstream &outfile, int my_rank
                     save_positions_func(rNew, outfile);
                 }
             }
-
-            else {
+            // rejected move:
+            else{
                 for(int j=0; j<nDimensions; j++) {
                     rNew(i,j) = rOld(i,j);
                 }
@@ -365,7 +359,6 @@ double VMCSolver::localEnergy(const mat &r)
 {
     // optimized computation of local energy
     if (energySelector == "optimized"){
-
         double potentialEnergy = 0;
         double rSingleParticle = 0;
 
@@ -390,6 +383,7 @@ double VMCSolver::localEnergy(const mat &r)
                 }
             }
         }
+
         // Potential energy in molecules
         if (molecule){
             potentialEnergy += MoleculePotentialEnergy();
@@ -408,7 +402,6 @@ double VMCSolver::localEnergy(const mat &r)
             return kineticEnergy + potentialEnergy;
         }
     }
-
 
     else if(energySelector == "numerical"){
         mat rPlus = zeros<mat>(nParticles, nDimensions);
@@ -557,6 +550,8 @@ void VMCSolver::r_func(const mat &positions){
     }
 }
 
+
+// compute potential energy in molecules
 double VMCSolver::MoleculePotentialEnergy(){
     double potentialEnergy = 0.0;
     for(int i=0; i<nParticles; i++){
@@ -604,8 +599,6 @@ void VMCSolver::fill_a_matrix(){
 }
 
 
-
-
 // compute R_c ratio
 void VMCSolver::compute_R_c(int k){
     double deltaU = 0.0;
@@ -617,8 +610,6 @@ void VMCSolver::compute_R_c(int k){
     }
     R_c = exp(deltaU);
 }
-
-
 
 
 // NB: Not used in the computations
@@ -692,9 +683,6 @@ double VMCSolver::computeJastrowEnergy(){
     }
     return sum;
 }
-
-
-
 
 
 // efficient algorithm to update correlation matrix
@@ -777,7 +765,7 @@ void VMCSolver::findOptimalBeta(int my_rank, int world_size){
 }
 
 
-// Reads a file and store values in a matrix
+// Reads a file with GTO values and store values in a matrix
 void VMCSolver::ReadFile_fillGTO(mat &GTO_mat, string filename){
     int num_rows = GTO_mat.n_rows;
     double GTO_alpha, GTO_c;
@@ -800,7 +788,8 @@ void VMCSolver::ReadFile_fillGTO(mat &GTO_mat, string filename){
     GTO_mat = GTO_values;
 }
 
-// Reads a file and store values in a matrix
+
+// Reads a file and store GTO coeffcients in a matrix
 void VMCSolver::ReadFile_fillGTO_coef(mat &GTO_coef_mat, string filename){
     int num_rows = GTO_coef_mat.n_rows;
     double GTO_c1, GTO_c2, GTO_c3, GTO_c4, GTO_c5;
@@ -855,7 +844,7 @@ void VMCSolver::fillGTO(){
 }
 
 
-// Fill GTO_matrices for Helium, Beryllium and Neon with 3-21G basis set
+// Fill GTO_coefficients_matrices for Helium, Beryllium and Neon with 3-21G basis set
 void VMCSolver::fillGTO_coef(){
     int num_rows_helium = 2; int num_rows_beryllium = 9; int num_rows_neon = 9;
     GTO_coef_helium = zeros<mat>(num_rows_helium, 1);
@@ -888,7 +877,7 @@ void VMCSolver::fillGTO_coef(){
 
 
 
-
+// Some old functions to run the program numerical for beryllium:
 
 // 1s hydrogenic orbital
 double VMCSolver::psi1s(double &radius){
@@ -945,6 +934,7 @@ double VMCSolver::JastrowMultiplicator(){
     return Psi;
 }
 
+// Old wavefunction without optimization
 double VMCSolver::waveFunction(const mat &r)
 {
     if (AtomType == "He"){
@@ -1005,13 +995,4 @@ double VMCSolver::waveFunction(const mat &r)
         return(0);
     }
 }
-
-
-
-
-
-
-
-
-
 

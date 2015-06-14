@@ -1,10 +1,9 @@
+// This file contain all Slater functions and orbitals needed for using hydrogenic wave functions on molecules
 
 #include "molecules.h"
-
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
-
 #include <armadillo>
 #include <iostream>
 #include <time.h>
@@ -108,7 +107,7 @@ double VMCSolver::SlaterLaplacian(){
 }
 
 
-
+// Hydrogenic orbitals for molecules
 double VMCSolver::SlaterPsi(int i, int j){
 
     double r1, r2;
@@ -211,17 +210,5 @@ double VMCSolver::Psi_laplacian(int i, int j){
         exit(1);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 

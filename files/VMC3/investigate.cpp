@@ -6,12 +6,10 @@ and functions to perform spesific collection of data from MC simulations
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
-
 #include <armadillo>
 #include <iostream>
 #include <time.h>
 #include <fstream>
-
 #include <mpi.h>
 
 using namespace arma;
@@ -104,7 +102,6 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
         maximum_Beta = 0.15;
     }
 
-
     fstream outfile;
     outfile.open("Parameter_Energy_xxx.dat", ios::out);
 
@@ -115,7 +112,6 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
         resolution = (maximum_Alpha - minimum_Alpha)/nPoints;
         alpha = minimum_Alpha + resolution*alphaCounter;
         alpha_proc = alpha;
-
 
         for(int betaCounter = 0; betaCounter < nPoints; betaCounter++){
             resolution = (maximum_Beta - minimum_Beta)/nPoints;
@@ -279,7 +275,6 @@ void VMCSolver::InvestigateOptimalParameters(int my_rank, int world_size){
 }
 
 
-
 // function that run MC simulations with different number of nCycles, compute the energy for every simulation, and write to file
 void VMCSolver::InvestigateVarianceNcycles(){
     int nSimulations = 40;
@@ -299,7 +294,6 @@ void VMCSolver::InvestigateVarianceNcycles(){
     }
     outfile.close();
 }
-
 
 
 // function that run MC simulations for all combinations of wavefunc and energySolver for with different number of nCycles,
@@ -335,7 +329,6 @@ void VMCSolver::InvestigateCPUtime(int my_rank, int world_size){
 }
 
 
-
 // function that run MC simulations for different timesteps, and store all relevant data for each simulation, and write the data to file
 void VMCSolver::InvestigateTimestep(){
 
@@ -364,7 +357,6 @@ void VMCSolver::InvestigateTimestep(){
 }
 
 
-
 // function that run a MC simulation, compute and store all intermediate energy, and write the energy to file
 void VMCSolver::BlockingFunc(int my_rank, int world_size){
 
@@ -381,7 +373,6 @@ void VMCSolver::BlockingFunc(int my_rank, int world_size){
 }
 
 
-
 // function that run a MC simulation, storing all intermediate positions for all electrons, and write the postions to file
 void VMCSolver::OnebodyDensity_ChargeDensity(int my_rank, int world_size){
 
@@ -395,6 +386,7 @@ void VMCSolver::OnebodyDensity_ChargeDensity(int my_rank, int world_size){
 }
 
 
+// Function to run over different inter-molecular distances and compute corresponding energy with optimal beta, write results to file
 void VMCSolver::R_dependence_molecules(int my_rank, int world_size){
     nCycles = 1000000;
 

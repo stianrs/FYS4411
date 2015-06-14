@@ -7,21 +7,16 @@ in "investigate.cpp" using vmcsolver.cpp.
 #include "investigate.h"
 #include "hydrogenic.h"
 #include "gaussian.h"
-
-
 #include <iostream>
 #include <armadillo>
-
 #include <mpi.h>
-
-
 
 using namespace std;
 using namespace arma;
 
 int main(int nargs, char *args[])
 {
-    int nCycles = 1e6;
+    int nCycles = 1e7;
 
     int my_rank, world_size;
     double energy, sum_energy;
@@ -31,6 +26,7 @@ int main(int nargs, char *args[])
     MPI_Comm_rank (MPI_COMM_WORLD, &my_rank);
     MPI_Comm_size (MPI_COMM_WORLD, &world_size);
 
+    // Run a standard MC simulation to compute ground state energy
     VMCSolver *solver = new VMCSolver();
     energy = solver->runMonteCarloIntegration(nCycles, my_rank, world_size);
 
@@ -58,37 +54,21 @@ int main(int nargs, char *args[])
     //VMCSolver *investigateR_dependence_molecules = new VMCSolver();
     //investigateR_dependence_molecules ->R_dependence_molecules(my_rank, world_size);
 
+    //VMCSolver *investigateAlpha = new VMCSolver();
+    //investigateAlpha->InvestigateOptimalAlpha();
+
+    //VMCSolver *investigateVariance = new VMCSolver();
+    //investigateVariance->InvestigateVarianceNcycles();
+
+    //VMCSolver *investigateCPU = new VMCSolver();
+    //investigateCPU->InvestigateCPUtime();
+
+    //VMCSolver *investigateTimestepDependence = new VMCSolver();
+    //investigateTimestepDependence ->InvestigateTimestep();
+
 
     // Clean up and close the MPI environment
     MPI_Finalize();
 
-
-
-    /*
-
-    VMCSolver *investigateAlpha = new VMCSolver();
-    investigateAlpha->InvestigateOptimalAlpha();
-
-    VMCSolver *investigateParameters = new VMCSolver();
-    investigateParameters->InvestigateOptimalParameters();
-
-    VMCSolver *investigateVariance = new VMCSolver();
-    investigateVariance->InvestigateVarianceNcycles();
-
-    VMCSolver *Blocking = new VMCSolver();
-    Blocking->BlockingFunc();
-
-    VMCSolver *investigateCPU = new VMCSolver();
-    investigateCPU->InvestigateCPUtime();
-
-    VMCSolver *investigateTimestepDependence = new VMCSolver();
-    investigateTimestepDependence ->InvestigateTimestep();
-
-    VMCSolver *investigateOnebodyDensity_ChargeDensity = new VMCSolver();
-    investigateOnebodyDensity_ChargeDensity ->OnebodyDensity_ChargeDensity();
-
-*/
     return 0;
-
-
 }

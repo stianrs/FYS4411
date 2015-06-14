@@ -1,10 +1,9 @@
+// This file contain all Slater functions and orbitals needed for using hydrogenic wave functions
 
 #include "hydrogenic.h"
-
 #include "vmcsolver.h"
 #include "lib.h"
 #include "investigate.h"
-
 #include <armadillo>
 #include <iostream>
 #include <time.h>
@@ -13,9 +12,6 @@
 
 using namespace arma;
 using namespace std;
-
-
-
 
 // compute the Slater determinant for the first time
 void VMCSolver::SlaterDeterminant(){
@@ -72,10 +68,6 @@ void VMCSolver::update_D(mat& D_new, const mat& D_old, int i, int selector){
 }
 
 
-
-
-
-
 // compute slater first derivative
 void VMCSolver::SlaterGradient(int i){
     if(i < nParticles/2){
@@ -115,10 +107,7 @@ double VMCSolver::SlaterLaplacian(){
 }
 
 
-
-
-
-
+// Hydrogenic orbitals
 double VMCSolver::SlaterPsi(int i, int j){
 
     double r;
